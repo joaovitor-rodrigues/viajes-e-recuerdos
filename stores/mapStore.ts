@@ -8,7 +8,6 @@ interface CreationPosition {
 
 interface GlobeInstance {
   pointOfView: (pov: { lat: number; lng: number; altitude?: number }, ms?: number) => void
-  camera: () => { position: { x: number; y: number; z: number } }
 }
 
 interface MapStore {
