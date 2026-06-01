@@ -38,7 +38,7 @@ interface Props {
 }
 
 export default function PinCreationMarker({ position }: Props) {
-  const map = useMap()
+  useMap()
   const store = useMapStore()
   const markerRef = useRef<L.Marker | null>(null)
 

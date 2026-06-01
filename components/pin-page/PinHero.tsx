@@ -164,7 +164,7 @@ export default function PinHero({ pin }: Props) {
               Excluir esta memória?
             </p>
             <p style={{ margin: '0 0 24px', fontSize: 13, color: '#9b93b4' }}>
-              "{pin.title}" será removida permanentemente.
+              &ldquo;{pin.title}&rdquo; será removida permanentemente.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button

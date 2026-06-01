@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { usePins } from '@/hooks/usePins'
 import { useMapStore } from '@/stores/mapStore'
 import { PinSchema, type PinInput } from '@/lib/validations'
-import type { Pin } from '@/types/database'
 import MediaInput from './MediaInput'
 
 const COLOR_SWATCHES = [
