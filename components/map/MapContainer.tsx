@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import type { GlobeMethods } from 'react-globe.gl'
+import type { Feature } from 'geojson'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Pin, VisualTheme } from '@/types/database'
 import { usePinsStore } from '@/stores/pinsStore'
@@ -77,7 +78,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
   const globeInitialized = useRef(false)
   const containerRef     = useRef<HTMLDivElement>(null)
   const [size, setSize]      = useState({ w: 800, h: 600 })
-  const [countries, setCountries] = useState<object[]>([])
+  const [countries, setCountries] = useState<Feature[]>([])
 
   const setPins = usePinsStore((s) => s.setPins)
   const pins    = usePinsStore((s) => s.pins)
@@ -212,7 +213,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
           atmosphereColor={style.atmosphere}
           atmosphereAltitude={0.12}
           polygonsData={countries}
-          polygonGeoJsonGeometry={(d: object) => (d as Record<string, unknown>).geometry}
+          polygonGeoJsonGeometry={(d: object) => (d as Feature).geometry!}
           polygonCapColor={() => style.land}
           polygonSideColor={() => style.landSide}
           polygonStrokeColor={() => style.border}
