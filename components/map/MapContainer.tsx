@@ -77,7 +77,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
   const globeInitialized = useRef(false)
   const containerRef     = useRef<HTMLDivElement>(null)
   const [size, setSize]      = useState({ w: 800, h: 600 })
-  const [countries, setCountries] = useState<Feature[]>([])
+  const [countries, setCountries] = useState<object[]>([])
 
   const setPins = usePinsStore((s) => s.setPins)
   const pins    = usePinsStore((s) => s.pins)
