@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Pin, VisualTheme } from '@/types/database'
 import { usePinsStore } from '@/stores/pinsStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -50,6 +51,11 @@ function oceanDataUri(hex: string): string {
   return c.toDataURL()
 }
 
+interface GlobeRef {
+  pointOfView: (pov: { lat: number; lng: number; altitude?: number }, ms?: number) => void
+  controls: () => { enablePan: boolean; minDistance: number; maxDistance: number; zoomSpeed: number }
+}
+
 interface GlobePoint {
   _type: 'pin' | 'creation'
   lat: number
@@ -64,11 +70,11 @@ interface Props {
 
 export default function MapContainer({ initialPins, theme: serverTheme }: Props) {
   const router = useRouter()
-  const globeEl          = useRef<any>(null)
+  const globeEl          = useRef<GlobeRef | null>(null)
   const globeInitialized = useRef(false)
   const containerRef     = useRef<HTMLDivElement>(null)
   const [size, setSize]      = useState({ w: 800, h: 600 })
-  const [countries, setCountries] = useState<any[]>([])
+  const [countries, setCountries] = useState<object[]>([])
 
   const setPins = usePinsStore((s) => s.setPins)
   const pins    = usePinsStore((s) => s.pins)
@@ -85,8 +91,9 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
       import('topojson-client'),
       fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json').then((r) => r.json()),
     ]).then(([{ feature }, topo]) => {
-      const geo = feature(topo as any, (topo as any).objects.countries)
-      setCountries((geo as any).features)
+      const topology = topo as Topology
+      const geo = feature(topology, topology.objects.countries as GeometryCollection)
+      setCountries(geo.features)
     })
   }, [])
 
@@ -102,7 +109,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
   }, [])
 
   // Callback ref — fires once when Globe mounts
-  const onGlobeRef = useCallback((el: any) => {
+  const onGlobeRef = useCallback((el: GlobeRef | null) => {
     if (!el || globeInitialized.current) return
     globeInitialized.current = true
     globeEl.current = el
@@ -203,7 +210,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
           atmosphereColor={style.atmosphere}
           atmosphereAltitude={0.12}
           polygonsData={countries}
-          polygonGeoJsonGeometry={(d: any) => d.geometry}
+          polygonGeoJsonGeometry={(d: object) => (d as Record<string, unknown>).geometry}
           polygonCapColor={() => style.land}
           polygonSideColor={() => style.landSide}
           polygonStrokeColor={() => style.border}
