@@ -10,7 +10,7 @@ function toast(message: string, type: 'success' | 'error') {
 }
 
 export function usePins() {
-  const { pins, isLoading, setPins, addPin, updatePin, removePin, setLoading } = usePinsStore()
+  const { pins, isLoading, setPins, addPin, removePin, setLoading } = usePinsStore()
 
   async function fetchPins() {
     setLoading(true)
@@ -97,38 +97,45 @@ export function usePins() {
   return { pins, isLoading, fetchPins, createPin, updatePin, deletePin, getPinById }
 }
 
+// Module-level subscription — runs once per page load, immune to Strict Mode double-invoke
+let pinsSubscribed = false
+
+function subscribeToPins() {
+  if (pinsSubscribed) return
+  pinsSubscribed = true
+
+  const supabase = createClient()
+  supabase
+    .channel('pins')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'pins' },
+      (payload) => {
+        usePinsStore.getState().addPin(payload.new as Pin)
+        toast('Nova memória adicionada 💕', 'success')
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'pins' },
+      (payload) => {
+        const pin = payload.new as Pin
+        usePinsStore.getState().updatePin(pin.id, pin)
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'pins' },
+      (payload) => {
+        usePinsStore.getState().removePin((payload.old as Pin).id)
+        toast('Memória removida', 'success')
+      }
+    )
+    .subscribe()
+}
+
 export function useRealtimeSync() {
-  const { addPin, updatePin, removePin } = usePinsStore()
-
   useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel('pins')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pins' },
-        (payload) => {
-          addPin(payload.new as Pin)
-          toast('Nova memória adicionada 💕', 'success')
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pins' },
-        (payload) => {
-          updatePin((payload.new as Pin).id, payload.new as Partial<Pin>)
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'pins' },
-        (payload) => {
-          removePin((payload.old as Pin).id)
-          toast('Memória removida', 'success')
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    subscribeToPins()
+  }, [])
 }
