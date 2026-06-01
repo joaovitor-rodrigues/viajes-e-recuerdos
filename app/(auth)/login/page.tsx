@@ -16,7 +16,7 @@ const fadeUp = {
 
 const shakeKeyframes = {
   x: [-10, 10, -8, 8, -5, 5, -2, 2, 0],
-  transition: { duration: 0.45, ease: 'easeInOut' },
+  transition: { duration: 0.45, ease: 'easeInOut' as const },
 }
 
 function ArrowIcon() {
