@@ -17,18 +17,37 @@ import ParticleCanvas from '@/components/theme/ParticleCanvas'
 
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false })
 
-const GLOBE_TEXTURES: Record<string, string> = {
-  light:      '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-  watercolor: '//unpkg.com/three-globe/example/img/earth-topology.png',
-  // fallbacks for legacy DB values
-  dark:       '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-  minimal:    '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-  osm:        '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-}
+// Visual config per map style — no photorealistic textures, purely polygon-based
+const MAP_CONFIG = {
+  light: {
+    ocean:      '#a8cfe8',   // Google Maps–style light blue ocean
+    land:       '#e8efdf',   // soft green land
+    landSide:   '#ccd8c0',
+    border:     '#ffffff',
+    atmosphere: 'rgba(100,160,255,0.5)',
+    background: 'radial-gradient(ellipse at center, #1a3060 0%, #080818 100%)',
+  },
+  watercolor: {
+    ocean:      '#c8b99a',   // aged parchment ocean
+    land:       '#d9c4a0',   // warm tan land
+    landSide:   '#c4aa80',
+    border:     '#7a5430',   // dark brown borders
+    atmosphere: 'rgba(180,140,70,0.4)',
+    background: 'radial-gradient(ellipse at center, #2a1a08 0%, #0a0604 100%)',
+  },
+} as const
 
-const GLOBE_ATMOSPHERE: Record<string, string> = {
-  light:      'rgba(100,160,255,0.55)',
-  watercolor: 'rgba(200,150,80,0.5)',
+type StyleKey = keyof typeof MAP_CONFIG
+
+// Generate a 4×2 solid-color canvas data URI for the globe ocean base
+function oceanDataUri(hex: string): string {
+  if (typeof document === 'undefined') return ''
+  const c = document.createElement('canvas')
+  c.width = 4; c.height = 2
+  const ctx = c.getContext('2d')!
+  ctx.fillStyle = hex
+  ctx.fillRect(0, 0, 4, 2)
+  return c.toDataURL()
 }
 
 interface GlobePoint {
@@ -45,10 +64,11 @@ interface Props {
 
 export default function MapContainer({ initialPins, theme: serverTheme }: Props) {
   const router = useRouter()
-  const globeEl = useRef<any>(null)
+  const globeEl          = useRef<any>(null)
   const globeInitialized = useRef(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [size, setSize] = useState({ w: 800, h: 600 })
+  const containerRef     = useRef<HTMLDivElement>(null)
+  const [size, setSize]      = useState({ w: 800, h: 600 })
+  const [countries, setCountries] = useState<any[]>([])
 
   const setPins = usePinsStore((s) => s.setPins)
   const pins    = usePinsStore((s) => s.pins)
@@ -59,19 +79,29 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
 
   useEffect(() => { setPins(initialPins) }, [initialPins, setPins])
 
-  // Track container size for Globe dimensions
+  // Load country polygons once (world-atlas topojson → geojson features)
+  useEffect(() => {
+    Promise.all([
+      import('topojson-client'),
+      fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json').then((r) => r.json()),
+    ]).then(([{ feature }, topo]) => {
+      const geo = feature(topo as any, (topo as any).objects.countries)
+      setCountries((geo as any).features)
+    })
+  }, [])
+
+  // Track container size
   useEffect(() => {
     if (!containerRef.current) return
     const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect
-      setSize({ w: width, h: height })
+      setSize({ w: entry.contentRect.width, h: entry.contentRect.height })
     })
     observer.observe(containerRef.current)
     setSize({ w: containerRef.current.offsetWidth, h: containerRef.current.offsetHeight })
     return () => observer.disconnect()
   }, [])
 
-  // Callback ref: fires once when the Globe element mounts
+  // Callback ref — fires once when Globe mounts
   const onGlobeRef = useCallback((el: any) => {
     if (!el || globeInitialized.current) return
     globeInitialized.current = true
@@ -79,18 +109,20 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
     setGlobeRef(el)
     el.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0)
 
-    // Configure OrbitControls
     const controls = el.controls()
-    controls.enablePan  = false        // no panning off-axis
-    controls.minDistance = 110         // close zoom limit
-    controls.maxDistance = 420         // max zoom out (~altitude 3.2)
-    controls.zoomSpeed   = 2.0         // 2× more sensitive
+    controls.enablePan   = false
+    controls.minDistance = 110
+    controls.maxDistance = 420
+    controls.zoomSpeed   = 2.0
   }, [setGlobeRef])
 
-  const liveMapStyle    = useThemeStore((s) => s.theme.map_style)
-  const liveGlow        = useThemeStore((s) => s.theme.enable_glow)
-  const textureUrl      = GLOBE_TEXTURES[liveMapStyle] ?? GLOBE_TEXTURES.light
-  const atmosphereColor = GLOBE_ATMOSPHERE[liveMapStyle] ?? GLOBE_ATMOSPHERE.light
+  const liveMapStyle = useThemeStore((s) => s.theme.map_style)
+  const liveGlow     = useThemeStore((s) => s.theme.enable_glow)
+
+  const style = MAP_CONFIG[liveMapStyle as StyleKey] ?? MAP_CONFIG.light
+
+  // Solid-color ocean texture (data URI) — only recalculate when style changes
+  const oceanTexture = useMemo(() => oceanDataUri(style.ocean), [style.ocean])
 
   const globeData = useMemo<GlobePoint[]>(() => [
     ...pins.map((p) => ({ _type: 'pin' as const, lat: p.latitude, lng: p.longitude, pin: p })),
@@ -106,28 +138,26 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
       const el = document.createElement('div')
       el.style.cssText = 'pointer-events: none;'
       el.innerHTML = `
-        <style>@keyframes cp { 0%{box-shadow:0 0 0 0 rgba(201,72,91,.7)} 70%{box-shadow:0 0 0 14px rgba(201,72,91,0)} 100%{box-shadow:0 0 0 0 rgba(201,72,91,0)} }</style>
+        <style>@keyframes cp{0%{box-shadow:0 0 0 0 rgba(201,72,91,.7)}70%{box-shadow:0 0 0 14px rgba(201,72,91,0)}100%{box-shadow:0 0 0 0 rgba(201,72,91,0)}}</style>
         <div style="width:44px;height:44px;border-radius:50%;background:#C9485B;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:20px;animation:cp 1.4s ease-out infinite;">📍</div>
       `
       return el
     }
 
-    const pin = point.pin!
+    const pin   = point.pin!
     const color = pin.color ?? '#C9485B'
-    const shadow = liveGlow
-      ? `box-shadow: 0 0 8px 3px ${color}88, 0 0 16px 6px ${color}44;`
-      : ''
+    const shadow = liveGlow ? `box-shadow:0 0 8px 3px ${color}88,0 0 16px 6px ${color}44;` : ''
 
     const el = document.createElement('div')
     el.style.cssText = `
-      width: 36px; height: 36px;
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      background: ${color};
+      width:36px;height:36px;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      background:${color};
       ${shadow}
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      transition: transform 0.15s ease;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;
+      transition:transform 0.15s ease;
     `
     el.innerHTML = `<span style="transform:rotate(45deg);font-size:16px;line-height:1;display:block;">${pin.icon ?? '📍'}</span>`
     el.addEventListener('click', () => router.push(`/pin/${pin.id}`))
@@ -159,7 +189,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
           position: 'relative',
           height: '100vh',
           width: '100%',
-          background: 'radial-gradient(ellipse at center, #1a1040 0%, #080812 100%)',
+          background: style.background,
           overflow: 'hidden',
         }}
       >
@@ -167,11 +197,17 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
           ref={onGlobeRef}
           width={size.w}
           height={size.h}
-          globeImageUrl={textureUrl}
+          globeImageUrl={oceanTexture}
           backgroundColor="rgba(0,0,0,0)"
           showAtmosphere
-          atmosphereColor={atmosphereColor}
+          atmosphereColor={style.atmosphere}
           atmosphereAltitude={0.12}
+          polygonsData={countries}
+          polygonGeoJsonGeometry={(d: any) => d.geometry}
+          polygonCapColor={() => style.land}
+          polygonSideColor={() => style.landSide}
+          polygonStrokeColor={() => style.border}
+          polygonAltitude={0.006}
           htmlElementsData={globeData}
           htmlLat="lat"
           htmlLng="lng"

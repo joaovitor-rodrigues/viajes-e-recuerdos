@@ -6,9 +6,9 @@ import { useTheme } from '@/hooks/useTheme'
 import { useThemeStore } from '@/stores/themeStore'
 import type { VisualTheme } from '@/types/database'
 
-const MAP_STYLES: { id: VisualTheme['map_style']; label: string; description: string; bg: string; fg: string }[] = [
-  { id: 'light',      label: 'Moderno',  description: 'Fotorrealista',    bg: '#4a90d9', fg: '#fff' },
-  { id: 'watercolor', label: 'Vintage',  description: 'Relevo antigo',    bg: '#b8956a', fg: '#fff' },
+const MAP_STYLES: { id: VisualTheme['map_style']; label: string; description: string; bg: string }[] = [
+  { id: 'light',      label: 'Moderno',  description: 'Estilo Google Maps', bg: '#e8efdf' },
+  { id: 'watercolor', label: 'Vintage',  description: 'Estilo pergaminho',  bg: '#d9c4a0' },
 ]
 
 const PANEL_BG  = 'rgba(255,248,250,0.97)'
@@ -179,10 +179,11 @@ export default function ThemePanel() {
                       }}
                     >
                       <div style={{
-                        width: 28, height: 28, borderRadius: '50%',
+                        width: 28, height: 28, borderRadius: 6,
                         background: s.bg,
                         flexShrink: 0,
-                        boxShadow: `0 2px 6px ${s.bg}66`,
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        boxShadow: `0 2px 6px rgba(0,0,0,0.1)`,
                       }} />
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 600, color: TEXT, fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>
