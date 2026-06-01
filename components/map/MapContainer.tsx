@@ -18,11 +18,17 @@ import ParticleCanvas from '@/components/theme/ParticleCanvas'
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false })
 
 const GLOBE_TEXTURES: Record<string, string> = {
-  dark:       '//unpkg.com/three-globe/example/img/earth-night.jpg',
   light:      '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-  watercolor: '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-  minimal:    '//unpkg.com/three-globe/example/img/earth-dark.jpg',
+  watercolor: '//unpkg.com/three-globe/example/img/earth-topology.png',
+  // fallbacks for legacy DB values
+  dark:       '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+  minimal:    '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
   osm:        '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+}
+
+const GLOBE_ATMOSPHERE: Record<string, string> = {
+  light:      'rgba(100,160,255,0.55)',
+  watercolor: 'rgba(200,150,80,0.5)',
 }
 
 interface GlobePoint {
@@ -72,11 +78,19 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
     globeEl.current = el
     setGlobeRef(el)
     el.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0)
+
+    // Configure OrbitControls
+    const controls = el.controls()
+    controls.enablePan  = false        // no panning off-axis
+    controls.minDistance = 110         // close zoom limit
+    controls.maxDistance = 420         // max zoom out (~altitude 3.2)
+    controls.zoomSpeed   = 2.0         // 2× more sensitive
   }, [setGlobeRef])
 
-  const liveMapStyle = useThemeStore((s) => s.theme.map_style)
-  const liveGlow     = useThemeStore((s) => s.theme.enable_glow)
-  const textureUrl   = GLOBE_TEXTURES[liveMapStyle] ?? GLOBE_TEXTURES.dark
+  const liveMapStyle    = useThemeStore((s) => s.theme.map_style)
+  const liveGlow        = useThemeStore((s) => s.theme.enable_glow)
+  const textureUrl      = GLOBE_TEXTURES[liveMapStyle] ?? GLOBE_TEXTURES.light
+  const atmosphereColor = GLOBE_ATMOSPHERE[liveMapStyle] ?? GLOBE_ATMOSPHERE.light
 
   const globeData = useMemo<GlobePoint[]>(() => [
     ...pins.map((p) => ({ _type: 'pin' as const, lat: p.latitude, lng: p.longitude, pin: p })),
@@ -156,7 +170,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
           globeImageUrl={textureUrl}
           backgroundColor="rgba(0,0,0,0)"
           showAtmosphere
-          atmosphereColor="rgba(140,110,255,0.6)"
+          atmosphereColor={atmosphereColor}
           atmosphereAltitude={0.12}
           htmlElementsData={globeData}
           htmlLat="lat"

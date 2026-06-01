@@ -6,39 +6,44 @@ import { useTheme } from '@/hooks/useTheme'
 import { useThemeStore } from '@/stores/themeStore'
 import type { VisualTheme } from '@/types/database'
 
-const MAP_STYLES: { id: VisualTheme['map_style']; label: string; color: string }[] = [
-  { id: 'dark',       label: 'Escuro',      color: '#1a1a2e' },
-  { id: 'light',      label: 'Claro',       color: '#e8e0d5' },
-  { id: 'watercolor', label: 'Aquarela',    color: '#b8d4e8' },
-  { id: 'minimal',    label: 'Minimalista', color: '#f5f5f0' },
-  { id: 'osm',        label: 'Padrão',      color: '#d0e8c0' },
+const MAP_STYLES: { id: VisualTheme['map_style']; label: string; description: string; bg: string; fg: string }[] = [
+  { id: 'light',      label: 'Moderno',  description: 'Fotorrealista',    bg: '#4a90d9', fg: '#fff' },
+  { id: 'watercolor', label: 'Vintage',  description: 'Relevo antigo',    bg: '#b8956a', fg: '#fff' },
 ]
+
+const PANEL_BG  = 'rgba(255,248,250,0.97)'
+const BORDER    = '1px solid rgba(201,72,91,0.1)'
+const SHADOW    = '0 12px 40px rgba(100,50,80,0.15)'
+const TEXT      = '#2a1f2e'
+const MUTED     = '#9b8ca0'
+const DIVIDER   = 'rgba(201,72,91,0.08)'
 
 const LABEL: React.CSSProperties = {
   fontSize: 10,
-  color: '#555',
+  color: MUTED,
   textTransform: 'uppercase',
   letterSpacing: '0.09em',
   marginBottom: 8,
   display: 'block',
   fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+  fontWeight: 600,
 }
 
 const SECTION: React.CSSProperties = {
   marginBottom: 20,
   paddingBottom: 20,
-  borderBottom: '1px solid rgba(255,255,255,0.06)',
+  borderBottom: `1px solid ${DIVIDER}`,
 }
 
 function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-      <span style={{ fontSize: 13, color: '#ccc', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>{label}</span>
+      <span style={{ fontSize: 13, color: TEXT, fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>{label}</span>
       <button
         onClick={() => onChange(!value)}
         style={{
           width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer',
-          background: value ? 'var(--primary-color, #C9485B)' : 'rgba(255,255,255,0.12)',
+          background: value ? 'var(--primary-color, #C9485B)' : 'rgba(0,0,0,0.1)',
           position: 'relative', transition: 'background 0.2s',
           flexShrink: 0,
         }}
@@ -47,6 +52,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
           position: 'absolute', top: 3, left: value ? 21 : 3,
           width: 16, height: 16, borderRadius: '50%', background: '#fff',
           transition: 'left 0.2s',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
         }} />
       </button>
     </div>
@@ -74,7 +80,6 @@ export default function ThemePanel() {
   const panelRef = useRef<HTMLDivElement>(null)
   const { theme, updateAndSync, resetToDefault } = useTheme()
   const position = useThemeStore((s) => s.theme.sidebar_position)
-
   const isRight = position === 'right'
 
   useEffect(() => {
@@ -98,14 +103,14 @@ export default function ThemePanel() {
     [isRight ? 'left' : 'right']: 20,
     zIndex: 600,
     width: 44, height: 44, borderRadius: '50%',
-    background: 'rgba(10,10,20,0.88)',
-    backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.12)',
+    background: PANEL_BG,
+    backdropFilter: 'blur(16px)',
+    border: BORDER,
     cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: open ? 'var(--primary-color, #C9485B)' : '#888',
-    transition: 'color 0.2s, border-color 0.2s, background 0.2s',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+    color: open ? 'var(--primary-color, #C9485B)' : MUTED,
+    transition: 'color 0.2s, box-shadow 0.2s',
+    boxShadow: SHADOW,
   }
 
   const panelStyle: React.CSSProperties = {
@@ -116,30 +121,18 @@ export default function ThemePanel() {
     width: 300,
     maxHeight: '70vh',
     overflowY: 'auto',
-    background: 'rgba(10,10,20,0.97)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 16,
-    padding: 18,
-    color: '#f0ece4',
-    boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+    background: PANEL_BG,
+    backdropFilter: 'blur(24px)',
+    border: BORDER,
+    borderRadius: 20,
+    padding: 20,
+    color: TEXT,
+    boxShadow: SHADOW,
   }
 
   return (
     <div ref={panelRef}>
-      <button
-        style={btnStyle}
-        onClick={() => setOpen((o) => !o)}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = 'rgba(20,20,35,0.95)'
-          ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.2)'
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = 'rgba(10,10,20,0.88)'
-          ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'
-        }}
-        aria-label="Personalizar tema"
-      >
+      <button style={btnStyle} onClick={() => setOpen((o) => !o)} aria-label="Personalizar tema">
         <SettingsIcon />
       </button>
 
@@ -153,49 +146,55 @@ export default function ThemePanel() {
             transition={{ duration: 0.2 }}
           >
             <h3 style={{
-              margin: '0 0 18px',
-              fontSize: 11,
-              color: 'var(--secondary-color, #4ECDC4)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
+              margin: '0 0 18px', fontSize: 11,
+              color: 'var(--primary-color, #C9485B)',
+              textTransform: 'uppercase', letterSpacing: '0.1em',
               fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+              fontWeight: 700,
             }}>
               Personalizar
             </h3>
 
             {/* A — Map Style */}
             <div style={SECTION}>
-              <span style={LABEL}>Estilo do Mapa</span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-                {MAP_STYLES.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => updateAndSync({ map_style: s.id })}
-                    style={{
-                      padding: '8px 4px 6px',
-                      borderRadius: 8,
-                      border: theme.map_style === s.id
-                        ? '2px solid var(--primary-color, #C9485B)'
-                        : '1px solid rgba(255,255,255,0.08)',
-                      cursor: 'pointer',
-                      background: s.color,
-                      transition: 'border-color 0.15s',
-                    }}
-                    title={s.label}
-                  >
-                    <div style={{
-                      fontSize: 8,
-                      color: s.id === 'dark' ? '#aaa' : '#333',
-                      textAlign: 'center',
-                      marginTop: 2,
-                      fontFamily: 'var(--font-inter, "Inter", sans-serif)',
-                      fontWeight: 500,
-                      lineHeight: 1.2,
-                    }}>
-                      {s.label}
-                    </div>
-                  </button>
-                ))}
+              <span style={LABEL}>Estilo do Globo</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {MAP_STYLES.map((s) => {
+                  const active = theme.map_style === s.id
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => updateAndSync({ map_style: s.id })}
+                      style={{
+                        padding: '12px 10px',
+                        borderRadius: 12,
+                        border: active ? '2px solid var(--primary-color, #C9485B)' : `1px solid ${DIVIDER}`,
+                        cursor: 'pointer',
+                        background: active ? 'rgba(201,72,91,0.06)' : 'rgba(0,0,0,0.02)',
+                        textAlign: 'left',
+                        transition: 'all 0.15s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        background: s.bg,
+                        flexShrink: 0,
+                        boxShadow: `0 2px 6px ${s.bg}66`,
+                      }} />
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: TEXT, fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>
+                          {s.label}
+                        </div>
+                        <div style={{ fontSize: 10, color: MUTED, fontFamily: 'var(--font-inter, "Inter", sans-serif)', marginTop: 1 }}>
+                          {s.description}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -215,8 +214,8 @@ export default function ThemePanel() {
                       style={{ width: 32, height: 32, border: 'none', borderRadius: 6, cursor: 'pointer', padding: 2, background: 'none' }}
                     />
                     <div>
-                      <div style={{ fontSize: 12, color: '#ccc', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>{label}</div>
-                      <div style={{ fontSize: 10, color: '#555', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>{theme[key] as string}</div>
+                      <div style={{ fontSize: 12, color: TEXT, fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>{label}</div>
+                      <div style={{ fontSize: 10, color: MUTED, fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>{theme[key] as string}</div>
                     </div>
                     <div style={{
                       marginLeft: 'auto', width: 24, height: 24, borderRadius: '50%',
@@ -239,42 +238,44 @@ export default function ThemePanel() {
             {/* D — Layout */}
             <div style={SECTION}>
               <span style={LABEL}>Posição do botão de tema</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
                 {([
-                  { id: 'left',   label: '← Esquerda' },
-                  { id: 'right',  label: 'Direita →' },
+                  { id: 'left',  label: '← Esquerda' },
+                  { id: 'right', label: 'Direita →' },
                 ] as { id: VisualTheme['sidebar_position']; label: string }[]).map((opt) => (
-                  <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      checked={theme.sidebar_position === opt.id}
-                      onChange={() => updateAndSync({ sidebar_position: opt.id })}
-                      style={{ accentColor: 'var(--primary-color, #C9485B)' }}
-                    />
-                    <span style={{ fontSize: 13, color: '#ccc', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>{opt.label}</span>
-                  </label>
+                  <button
+                    key={opt.id}
+                    onClick={() => updateAndSync({ sidebar_position: opt.id })}
+                    style={{
+                      flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                      border: theme.sidebar_position === opt.id
+                        ? '1.5px solid var(--primary-color, #C9485B)'
+                        : `1px solid ${DIVIDER}`,
+                      background: theme.sidebar_position === opt.id ? 'rgba(201,72,91,0.06)' : 'transparent',
+                      color: theme.sidebar_position === opt.id ? 'var(--primary-color, #C9485B)' : MUTED,
+                      fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+                      fontWeight: theme.sidebar_position === opt.id ? 600 : 400,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
                 ))}
               </div>
             </div>
 
-            {/* F — Actions */}
+            {/* E — Actions */}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={resetToDefault}
                 style={{
                   flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#777',
+                  background: 'transparent', border: `1px solid ${DIVIDER}`, color: MUTED,
                   fontFamily: 'var(--font-inter, "Inter", sans-serif)',
-                  transition: 'border-color 0.15s, color 0.15s',
+                  transition: 'all 0.15s',
                 }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.25)'
-                  ;(e.currentTarget as HTMLButtonElement).style.color = '#aaa'
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'
-                  ;(e.currentTarget as HTMLButtonElement).style.color = '#777'
-                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(201,72,91,0.25)' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = DIVIDER }}
               >
                 Restaurar padrão
               </button>

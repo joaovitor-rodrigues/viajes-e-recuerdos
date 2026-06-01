@@ -90,12 +90,12 @@ export default function FloatingPinPanel() {
 
   const iconBtnStyle = (active?: boolean): React.CSSProperties => ({
     flexShrink: 0,
-    background: active ? 'rgba(201,72,91,0.18)' : 'rgba(255,255,255,0.06)',
-    border: `1px solid ${active ? 'rgba(201,72,91,0.35)' : 'rgba(255,255,255,0.1)'}`,
+    background: active ? 'rgba(201,72,91,0.1)' : 'rgba(201,72,91,0.04)',
+    border: `1px solid ${active ? 'rgba(201,72,91,0.3)' : 'rgba(201,72,91,0.1)'}`,
     borderRadius: 7,
     padding: '5px 7px',
     cursor: 'pointer',
-    color: active ? 'var(--primary-color, #C9485B)' : '#777',
+    color: active ? 'var(--primary-color, #C9485B)' : '#9b8ca0',
     display: 'flex',
     alignItems: 'center',
     gap: 4,
@@ -118,21 +118,21 @@ export default function FloatingPinPanel() {
         width: PANEL_W,
         x,
         y,
-        background: 'rgba(10,10,20,0.88)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(255,248,250,0.97)',
+        backdropFilter: 'blur(24px)',
+        border: '1px solid rgba(201,72,91,0.1)',
         borderRadius: 16,
         overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        boxShadow: '0 8px 32px rgba(100,50,80,0.14)',
         cursor: locked ? 'default' : 'grab',
         userSelect: 'none',
       }}
-      whileDrag={{ scale: 1.015, boxShadow: '0 18px 50px rgba(0,0,0,0.6)', cursor: 'grabbing' }}
+      whileDrag={{ scale: 1.015, boxShadow: '0 18px 50px rgba(100,50,80,0.22)', cursor: 'grabbing' }}
     >
       {/* Header */}
       <div style={{
         padding: '12px 12px 10px',
-        borderBottom: minimized ? 'none' : '1px solid rgba(255,255,255,0.07)',
+        borderBottom: minimized ? 'none' : '1px solid rgba(201,72,91,0.08)',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
@@ -143,13 +143,13 @@ export default function FloatingPinPanel() {
           <h1 style={{
             margin: 0, fontSize: 13,
             fontFamily: 'var(--font-family, "Cormorant Garamond", serif)',
-            fontWeight: 400, color: '#f0ece4', letterSpacing: '0.05em',
+            fontWeight: 400, color: '#2a1f2e', letterSpacing: '0.05em',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             Viajes e Recuerdos
           </h1>
           {!minimized && (
-            <p style={{ margin: '1px 0 0', fontSize: 10, color: '#555', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>
+            <p style={{ margin: '1px 0 0', fontSize: 10, color: '#9b8ca0', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>
               suas memórias pelo mundo
             </p>
           )}

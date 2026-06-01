@@ -71,7 +71,7 @@ export default function StatsBar() {
       gridTemplateColumns: 'repeat(3, 1fr)',
       gap: 8,
       padding: '14px 14px 12px',
-      borderBottom: '1px solid rgba(255,255,255,0.07)',
+      borderBottom: '1px solid rgba(201,72,91,0.08)',
     }}>
       {stats.map((s) => (
         <div key={s.label} style={{ textAlign: 'center' }}>
@@ -95,7 +95,7 @@ export default function StatsBar() {
           </div>
           <div style={{
             fontSize: 9,
-            color: '#555',
+            color: '#9b8ca0',
             textTransform: 'uppercase',
             letterSpacing: '0.07em',
             marginTop: 3,
