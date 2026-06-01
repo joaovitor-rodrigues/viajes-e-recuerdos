@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import type { GlobeMethods } from 'react-globe.gl'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Pin, VisualTheme } from '@/types/database'
 import { usePinsStore } from '@/stores/pinsStore'
@@ -51,9 +52,11 @@ function oceanDataUri(hex: string): string {
   return c.toDataURL()
 }
 
-interface GlobeRef {
-  pointOfView: (pov: { lat: number; lng: number; altitude?: number }, ms?: number) => void
-  controls: () => { enablePan: boolean; minDistance: number; maxDistance: number; zoomSpeed: number }
+interface OrbitControlsLike {
+  enablePan: boolean
+  minDistance: number
+  maxDistance: number
+  zoomSpeed: number
 }
 
 interface GlobePoint {
@@ -70,7 +73,7 @@ interface Props {
 
 export default function MapContainer({ initialPins, theme: serverTheme }: Props) {
   const router = useRouter()
-  const globeEl          = useRef<GlobeRef | null>(null)
+  const globeEl          = useRef<GlobeMethods | undefined>(undefined)
   const globeInitialized = useRef(false)
   const containerRef     = useRef<HTMLDivElement>(null)
   const [size, setSize]      = useState({ w: 800, h: 600 })
@@ -108,20 +111,19 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
     return () => observer.disconnect()
   }, [])
 
-  // Callback ref — fires once when Globe mounts
-  const onGlobeRef = useCallback((el: GlobeRef | null) => {
-    if (!el || globeInitialized.current) return
+  // Runs after every render until Globe has mounted and ref is populated
+  useEffect(() => {
+    if (!globeEl.current || globeInitialized.current) return
     globeInitialized.current = true
-    globeEl.current = el
-    setGlobeRef(el)
-    el.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0)
-
-    const controls = el.controls()
+    const globe = globeEl.current
+    setGlobeRef({ pointOfView: (pov, ms) => globe.pointOfView(pov, ms) })
+    globe.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0)
+    const controls = globe.controls() as OrbitControlsLike
     controls.enablePan   = false
     controls.minDistance = 110
     controls.maxDistance = 420
     controls.zoomSpeed   = 2.0
-  }, [setGlobeRef])
+  })
 
   const liveMapStyle = useThemeStore((s) => s.theme.map_style)
   const liveGlow     = useThemeStore((s) => s.theme.enable_glow)
@@ -201,7 +203,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
         }}
       >
         <Globe
-          ref={onGlobeRef}
+          ref={globeEl}
           width={size.w}
           height={size.h}
           globeImageUrl={oceanTexture}
