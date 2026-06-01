@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import type { GlobeMethods } from 'react-globe.gl'
+import type { GlobeMethods, GeoJsonGeometry } from 'react-globe.gl'
 import type { Feature } from 'geojson'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { Pin, VisualTheme } from '@/types/database'
@@ -213,7 +213,7 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
           atmosphereColor={style.atmosphere}
           atmosphereAltitude={0.12}
           polygonsData={countries}
-          polygonGeoJsonGeometry={(d: object) => (d as Feature).geometry!}
+          polygonGeoJsonGeometry={(d: object) => (d as Feature).geometry as unknown as GeoJsonGeometry}
           polygonCapColor={() => style.land}
           polygonSideColor={() => style.landSide}
           polygonStrokeColor={() => style.border}
