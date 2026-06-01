@@ -1,13 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { VisualTheme } from '@/types/database'
 import type { GeocodingResult } from '@/lib/geocoding'
 import { useMapStore } from '@/stores/mapStore'
-
-interface Props {
-  theme: VisualTheme | null
-}
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -18,24 +13,45 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced
 }
 
-export default function CitySearchBox({ theme }: Props) {
+function SearchIcon() {
+  return (
+    <svg
+      width="16" height="16" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round"
+      style={{ display: 'block' }}
+    >
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14" height="14" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2.5"
+      strokeLinecap="round"
+      style={{ display: 'block' }}
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+
+export default function CitySearchBox() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<GeocodingResult[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [hovered, setHovered] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const debouncedQuery = useDebounce(query, 400)
   const { flyTo, startCreation } = useMapStore()
-
-  const isRight = theme?.sidebar_position !== 'left'
-  const boxStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 16,
-    ...(isRight ? { right: 16 } : { left: 16 }),
-    zIndex: 1000,
-    width: 320,
-  }
 
   useEffect(() => {
     if (!debouncedQuery.trim()) {
@@ -87,44 +103,101 @@ export default function CitySearchBox({ theme }: Props) {
     }
   }, [])
 
+  const isActive = focused || hovered
+
   return (
-    <div ref={containerRef} style={boxStyle}>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    <div
+      ref={containerRef}
+      className="city-search-box"
+      style={{
+        position: 'absolute',
+        top: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        width: 440,
+        maxWidth: 'calc(100vw - 32px)',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {/* Search icon */}
+        <span style={{
+          position: 'absolute',
+          left: 16,
+          color: isActive ? 'var(--primary-color, #C9485B)' : '#666',
+          pointerEvents: 'none',
+          transition: 'color 0.2s',
+          display: 'flex',
+          alignItems: 'center',
+        }}>
+          <SearchIcon />
+        </span>
+
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar cidade..."
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="Buscar cidade ou país..."
           style={{
             width: '100%',
-            padding: '10px 40px 10px 14px',
-            borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.15)',
-            background: 'rgba(15,15,26,0.85)',
-            backdropFilter: 'blur(12px)',
+            padding: '13px 44px',
+            borderRadius: 28,
+            border: isActive
+              ? '1.5px solid rgba(201,72,91,0.45)'
+              : '1.5px solid rgba(255,255,255,0.12)',
+            background: isActive
+              ? 'rgba(10,10,20,0.96)'
+              : 'rgba(10,10,20,0.88)',
+            backdropFilter: 'blur(20px)',
             color: '#f0ece4',
             fontSize: 14,
+            fontFamily: 'var(--font-inter, "Inter", sans-serif)',
             outline: 'none',
             boxSizing: 'border-box',
+            boxShadow: focused
+              ? '0 8px 32px rgba(0,0,0,0.5), 0 0 0 3px rgba(201,72,91,0.12)'
+              : hovered
+                ? '0 6px 24px rgba(0,0,0,0.4)'
+                : '0 2px 12px rgba(0,0,0,0.25)',
+            transition: 'all 0.25s ease',
+            letterSpacing: '0.01em',
           }}
         />
+
         {query && (
           <button
             onClick={handleClear}
             style={{
               position: 'absolute',
-              right: 10,
-              background: 'none',
+              right: 14,
+              background: 'rgba(255,255,255,0.08)',
               border: 'none',
-              color: '#f0ece4',
+              borderRadius: '50%',
+              width: 24,
+              height: 24,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#aaa',
               cursor: 'pointer',
-              fontSize: 16,
               padding: 0,
-              lineHeight: 1,
+              transition: 'background 0.15s',
             }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.15)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)' }}
             aria-label="Limpar busca"
           >
-            ×
+            <CloseIcon />
           </button>
         )}
       </div>
@@ -133,17 +206,23 @@ export default function CitySearchBox({ theme }: Props) {
         <ul
           style={{
             listStyle: 'none',
-            margin: '4px 0 0',
+            margin: '6px 0 0',
             padding: 0,
-            background: 'rgba(15,15,26,0.95)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
+            background: 'rgba(10,10,20,0.97)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 16,
             overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           }}
         >
           {loading && (
-            <li style={{ padding: '10px 14px', color: '#888', fontSize: 13 }}>
+            <li style={{
+              padding: '12px 18px',
+              color: '#666',
+              fontSize: 13,
+              fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+            }}>
               Buscando...
             </li>
           )}
@@ -152,22 +231,34 @@ export default function CitySearchBox({ theme }: Props) {
               key={i}
               onClick={() => handleSelect(r)}
               style={{
-                padding: '10px 14px',
+                padding: '11px 18px',
                 cursor: 'pointer',
                 fontSize: 13,
                 color: '#f0ece4',
-                borderBottom: i < results.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+                borderBottom: i < results.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                transition: 'background 0.12s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLLIElement).style.background = 'rgba(201,72,91,0.2)'
+                (e.currentTarget as HTMLLIElement).style.background = 'rgba(201,72,91,0.15)'
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLLIElement).style.background = 'transparent'
               }}
             >
-              <div style={{ fontWeight: 500 }}>{r.city || r.displayName.split(',')[0]}</div>
-              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
-                {[r.state, r.country].filter(Boolean).join(', ')}
+              <span style={{ color: '#555', flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+              </span>
+              <div>
+                <div style={{ fontWeight: 500 }}>{r.city || r.displayName.split(',')[0]}</div>
+                <div style={{ fontSize: 11, color: '#666', marginTop: 1 }}>
+                  {[r.state, r.country].filter(Boolean).join(', ')}
+                </div>
               </div>
             </li>
           ))}

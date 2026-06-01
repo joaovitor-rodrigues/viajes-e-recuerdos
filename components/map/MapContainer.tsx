@@ -13,13 +13,15 @@ import MapPin from './MapPin'
 import CitySearchBox from './CitySearchBox'
 import PinCreationMarker from './PinCreationMarker'
 import PinCreateModal from '@/components/pins/PinCreateModal'
-import Sidebar from '@/components/sidebar/Sidebar'
+import FloatingPinPanel from '@/components/sidebar/FloatingPinPanel'
 import ThemePanel from '@/components/theme/ThemePanel'
 import ParticleCanvas from '@/components/theme/ParticleCanvas'
 
+// Stadia tiles use OSM data → names appear in each country's local language
+// (e.g. Brazilian cities in Portuguese, French cities in French, etc.)
 const TILE_URLS: Record<string, string> = {
-  dark:       'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light:      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  dark:       'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
+  light:      'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
   watercolor: 'https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg',
   minimal:    'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
   osm:        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -75,8 +77,8 @@ export default function MapContainer({ initialPins, theme: serverTheme }: Props)
           )}
         </LeafletMapContainer>
 
-        <Sidebar />
-        <CitySearchBox theme={serverTheme} />
+        <CitySearchBox />
+        <FloatingPinPanel />
         <ThemePanel />
         <PinCreateModal />
       </div>

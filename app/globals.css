@@ -7,7 +7,7 @@
   --secondary-color: #4ECDC4;
   --bg-color:        #0f0f1a;
   --text-color:      #f0ece4;
-  --font-family:     'Cormorant Garamond', serif;
+  --font-family:     var(--font-inter, 'Inter', system-ui, sans-serif);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -38,27 +38,25 @@ body {
 
 /* ─── Mobile ─────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  /* Sidebar becomes bottom sheet */
-  .sidebar-panel {
+  /* CitySearchBox full-width */
+  .city-search-box {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    transform: none !important;
+  }
+
+  /* FloatingPinPanel becomes bottom sheet */
+  .floating-pin-panel {
     position: fixed !important;
     top: auto !important;
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    height: 60vh !important;
-    border-top: 1px solid rgba(255,255,255,0.1) !important;
-    border-left: none !important;
-    border-right: none !important;
+    max-height: 55vh !important;
     border-radius: 16px 16px 0 0 !important;
-    transform: translateY(0) !important;
-  }
-
-  /* CitySearchBox full-width */
-  .city-search-box {
-    left: 8px !important;
-    right: 8px !important;
-    width: auto !important;
+    transform: none !important;
   }
 
   /* PinCreateModal full-screen */

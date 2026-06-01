@@ -49,7 +49,16 @@ export default async function PinPage({ params }: Props) {
   const videos = p.media.filter((m) => m.type === 'video')
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f0f1a', color: '#f0ece4', padding: '40px 16px' }}>
+    <div
+      className="pin-page-main"
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(145deg, #f3eeff 0%, #fde8ef 40%, #eef4ff 100%)',
+        color: '#1a1730',
+        padding: '40px 16px 60px',
+        fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+      }}
+    >
       <main style={{ maxWidth: 800, margin: '0 auto' }}>
 
         <PinHero pin={p} />
@@ -60,12 +69,19 @@ export default async function PinPage({ params }: Props) {
 
         {p.description && (
           <section style={{ marginBottom: 40 }}>
-            <h2 style={{ margin: '0 0 16px', fontSize: 14, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <h2 style={{
+              margin: '0 0 14px', fontSize: 11, color: '#9b93b4',
+              textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600,
+            }}>
               Memória
             </h2>
             <p style={{
-              margin: 0, fontSize: 17, lineHeight: 1.85, color: '#d0ccc4',
-              fontFamily: 'Cormorant Garamond, serif', whiteSpace: 'pre-wrap',
+              margin: 0,
+              fontSize: 16,
+              lineHeight: 1.85,
+              color: '#3a3555',
+              fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+              whiteSpace: 'pre-wrap',
             }}>
               {p.description}
             </p>
@@ -76,7 +92,10 @@ export default async function PinPage({ params }: Props) {
 
         {related.length > 0 && (
           <section>
-            <h2 style={{ margin: '0 0 16px', fontSize: 14, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <h2 style={{
+              margin: '0 0 14px', fontSize: 11, color: '#9b93b4',
+              textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600,
+            }}>
               Mais memórias em {p.city}
             </h2>
             <div style={{
@@ -92,28 +111,29 @@ export default async function PinPage({ params }: Props) {
                     textDecoration: 'none',
                     display: 'block',
                     padding: '14px 16px',
-                    borderRadius: 8,
+                    borderRadius: 12,
+                    background: 'rgba(255,255,255,0.8)',
+                    border: `1.5px solid ${r.color}40`,
                     borderLeft: `3px solid ${r.color}`,
-                    background: `${r.color}10`,
-                    border: `1px solid ${r.color}30`,
-                    transition: 'transform 0.15s, background 0.15s',
+                    transition: 'transform 0.15s, box-shadow 0.15s',
+                    boxShadow: '0 2px 10px rgba(120,80,180,0.06)',
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLAnchorElement
                     el.style.transform = 'translateY(-2px)'
-                    el.style.background = `${r.color}20`
+                    el.style.boxShadow = '0 6px 20px rgba(120,80,180,0.12)'
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget as HTMLAnchorElement
                     el.style.transform = 'translateY(0)'
-                    el.style.background = `${r.color}10`
+                    el.style.boxShadow = '0 2px 10px rgba(120,80,180,0.06)'
                   }}
                 >
                   <div style={{ fontSize: 22, marginBottom: 6 }}>{r.icon}</div>
-                  <div style={{ fontSize: 13, color: '#f0ece4', fontWeight: 500, marginBottom: 4, lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 13, color: '#1a1730', fontWeight: 600, marginBottom: 4, lineHeight: 1.3 }}>
                     {r.title}
                   </div>
-                  <div style={{ fontSize: 11, color: '#666' }}>
+                  <div style={{ fontSize: 11, color: '#9b93b4' }}>
                     {format(parse(r.pin_date, 'yyyy-MM-dd', new Date()), "MMM 'de' yyyy", { locale: ptBR })}
                   </div>
                 </Link>

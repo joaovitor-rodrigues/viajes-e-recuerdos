@@ -11,7 +11,7 @@ export const DEFAULT_THEME: VisualTheme = {
   enable_particles: true,
   enable_glow: true,
   enable_animations: true,
-  font_family: 'Cormorant Garamond',
+  font_family: 'Inter',
   sidebar_position: 'right',
   updated_at: '',
 }

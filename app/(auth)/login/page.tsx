@@ -19,6 +19,27 @@ const shakeKeyframes = {
   transition: { duration: 0.45, ease: 'easeInOut' },
 }
 
+function ArrowIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
+  )
+}
+
+function SpinnerIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+      style={{ animation: 'spin 0.8s linear infinite' }}>
+      <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+      <path d="M12 2a10 10 0 0 1 10 10" />
+    </svg>
+  )
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [password, setPassword] = useState('')
@@ -54,7 +75,7 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0f0f1a',
+      background: 'linear-gradient(145deg, #f3eeff 0%, #fde8ef 45%, #eef4ff 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -62,10 +83,14 @@ export default function LoginPage() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* Radial gradient backdrop */}
+      {/* Soft radial blobs */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 60% 50% at 50% 40%, rgba(201,72,91,0.08) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse 55% 45% at 30% 35%, rgba(180,150,230,0.18) 0%, transparent 65%)',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 45% 40% at 75% 65%, rgba(201,72,91,0.1) 0%, transparent 65%)',
       }} />
 
       <motion.form
@@ -75,115 +100,116 @@ export default function LoginPage() {
         animate="show"
         style={{ width: '100%', maxWidth: 360, position: 'relative', zIndex: 1 }}
       >
-        {/* Title */}
-        <motion.div variants={fadeUp} style={{ textAlign: 'center', marginBottom: 52 }}>
-          <h1 style={{
-            margin: 0,
-            fontSize: 'clamp(2rem, 8vw, 3rem)',
-            fontFamily: 'var(--font-cormorant, "Cormorant Garamond", serif)',
-            fontWeight: 400,
-            color: '#C9485B',
-            letterSpacing: '0.03em',
-            lineHeight: 1.1,
-          }}>
-            Viajes e Recuerdos
-          </h1>
-          <p style={{
-            margin: '10px 0 0',
-            fontSize: '1rem',
-            fontStyle: 'italic',
-            color: 'rgba(240,236,228,0.5)',
-            fontFamily: 'var(--font-cormorant, "Cormorant Garamond", serif)',
-          }}>
-            o nosso mapa
-          </p>
-        </motion.div>
-
-        {/* Password field */}
-        <motion.div variants={fadeUp} style={{ position: 'relative', marginBottom: 40 }}>
-          <AnimatePresence>
-            {shaking && (
-              <motion.div
-                key="shake"
-                animate={shakeKeyframes}
-                style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}
-              />
-            )}
-          </AnimatePresence>
-
-          <motion.div animate={shaking ? shakeKeyframes : {}}>
-            {/* Floating label */}
-            <label style={{
-              position: 'absolute',
-              left: 0,
-              top: floatLabel ? -18 : '50%',
-              transform: floatLabel ? 'none' : 'translateY(-50%)',
-              fontSize: floatLabel ? 11 : 14,
-              color: floatLabel ? '#C9485B' : 'rgba(240,236,228,0.35)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              transition: 'all 0.2s ease',
-              pointerEvents: 'none',
-              fontFamily: 'var(--font-cormorant, "Cormorant Garamond", serif)',
+        {/* Card */}
+        <motion.div
+          variants={fadeUp}
+          style={{
+            background: 'rgba(255,255,255,0.82)',
+            backdropFilter: 'blur(24px)',
+            border: '1px solid rgba(180,150,220,0.2)',
+            borderRadius: 24,
+            padding: '48px 40px 40px',
+            boxShadow: '0 8px 40px rgba(120,80,180,0.1)',
+          }}
+        >
+          {/* Title */}
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <h1 style={{
+              margin: 0,
+              fontSize: 'clamp(1.9rem, 8vw, 2.8rem)',
+              fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+              fontWeight: 700,
+              color: '#C9485B',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
             }}>
-              nossa senha
-            </label>
+              Viajes e Recuerdos
+            </h1>
+            <p style={{
+              margin: '10px 0 0',
+              fontSize: '0.9rem',
+              color: '#a090c0',
+              fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+              letterSpacing: '0.01em',
+            }}>
+              o nosso mapa
+            </p>
+          </div>
 
-            <input
-              ref={inputRef}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              autoComplete="current-password"
+          {/* Password field */}
+          <motion.div variants={fadeUp} style={{ position: 'relative', marginBottom: 36 }}>
+            <motion.div animate={shaking ? shakeKeyframes : {}}>
+              <label style={{
+                position: 'absolute',
+                left: 0,
+                top: floatLabel ? -18 : '50%',
+                transform: floatLabel ? 'none' : 'translateY(-50%)',
+                fontSize: floatLabel ? 11 : 14,
+                color: floatLabel ? '#C9485B' : '#c0b8d8',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                transition: 'all 0.2s ease',
+                pointerEvents: 'none',
+                fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+                fontWeight: floatLabel ? 600 : 400,
+              }}>
+                nossa senha
+              </label>
+
+              <input
+                ref={inputRef}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                autoComplete="current-password"
+                style={{
+                  width: '100%',
+                  padding: '10px 0',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: `1.5px solid ${focused ? '#C9485B' : 'rgba(150,120,200,0.3)'}`,
+                  color: '#1a1730',
+                  fontSize: 18,
+                  outline: 'none',
+                  fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+                  transition: 'border-color 0.2s',
+                  letterSpacing: '0.18em',
+                }}
+              />
+            </motion.div>
+          </motion.div>
+
+          {/* Submit */}
+          <motion.div variants={fadeUp} style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              type="submit"
+              disabled={loading || !password}
               style={{
-                width: '100%',
-                padding: '10px 0',
-                background: 'transparent',
+                width: 52, height: 52,
+                borderRadius: '50%',
+                background: loading || !password
+                  ? 'rgba(201,72,91,0.25)'
+                  : '#C9485B',
                 border: 'none',
-                borderBottom: `1px solid ${focused ? '#C9485B' : 'rgba(240,236,228,0.2)'}`,
-                color: '#f0ece4',
-                fontSize: 18,
-                outline: 'none',
-                fontFamily: 'inherit',
-                transition: 'border-color 0.2s',
-                letterSpacing: '0.15em',
+                cursor: loading || !password ? 'default' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff',
+                boxShadow: password && !loading ? '0 4px 20px rgba(201,72,91,0.4)' : 'none',
+                transition: 'all 0.22s',
               }}
-            />
+              aria-label="Entrar"
+            >
+              {loading ? <SpinnerIcon /> : <ArrowIcon />}
+            </button>
           </motion.div>
         </motion.div>
-
-        {/* Submit button */}
-        <motion.div variants={fadeUp} style={{ display: 'flex', justifyContent: 'center' }}>
-          <button
-            type="submit"
-            disabled={loading || !password}
-            style={{
-              width: 52, height: 52,
-              borderRadius: '50%',
-              background: loading || !password ? 'rgba(201,72,91,0.3)' : '#C9485B',
-              border: 'none',
-              cursor: loading || !password ? 'default' : 'pointer',
-              fontSize: 22,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: password ? '0 0 20px rgba(201,72,91,0.4)' : 'none',
-              transition: 'all 0.2s',
-            }}
-            aria-label="Entrar"
-          >
-            {loading ? (
-              <span style={{ fontSize: 18, animation: 'spin 0.8s linear infinite', display: 'inline-block' }}>
-                ○
-              </span>
-            ) : '→'}
-          </button>
-        </motion.div>
-
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-        `}</style>
       </motion.form>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }
