@@ -119,7 +119,7 @@ const PinEditForm = forwardRef<PinEditFormHandle, Props>(function PinEditForm(
   type PickerState = { filter: 'image' | 'video'; label: AccountLabel } | null
   const [photosPicker,  setPhotosPicker]  = useState<PickerState>(null)
   const [photosChooser, setPhotosChooser] = useState<'image' | 'video' | null>(null)
-  const [pickerError,   setPickerError]   = useState<string | null>(null)
+  const [pickerError] = useState<string | null>(null)
 
   const country    = watch('country')
   const startDate  = watch('start_date')
