@@ -1,203 +1,332 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { motion, useMotionValue, animate, AnimatePresence } from 'framer-motion'
+import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import StatsBar from './StatsBar'
 import PinList from './PinList'
+import { useMapStore } from '@/stores/mapStore'
 
-const PANEL_W = 300
-const MARGIN = 16
-const NAT_TOP = 80   // CSS top offset (below searchbox)
+const SIDEBAR_W = 300
 
-/* ── Icons ─────────────────────────────────────────────── */
-function LockClosedIcon() {
+function LogoutIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
-      <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      style={{ display: 'block' }}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   )
 }
 
-function LockOpenIcon() {
+function ChevronRight() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
-      <path d="M12 1C9.24 1 7 3.24 7 6v1H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2H9V6c0-1.66 1.34-3 3-3s3 1.34 3 3h2c0-2.76-2.24-5-5-5zm0 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ display: 'block' }}>
+      <polyline points="9 18 15 12 9 6" />
     </svg>
   )
 }
 
-function GripIcon() {
+function ChevronLeft() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" opacity={0.3} style={{ display: 'block', flexShrink: 0 }}>
-      <circle cx="9" cy="6"  r="1.5" /><circle cx="15" cy="6"  r="1.5" />
-      <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
-      <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ display: 'block' }}>
+      <polyline points="15 18 9 12 15 6" />
     </svg>
   )
 }
 
-function ChevronIcon({ up }: { up: boolean }) {
+const LABELS: { label: string; slug: string }[] = [
+  { label: 'João',    slug: 'joão' },
+  { label: 'Jéssica', slug: 'jéssica' },
+]
+
+type AccountRow = { label: string; email: string; expires_at: string }
+
+function GoogleAccountsBar() {
+  const [accounts, setAccounts] = useState<AccountRow[]>([])
+
+  useEffect(() => {
+    fetch('/api/photos/accounts')
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: AccountRow[]) => setAccounts(rows))
+      .catch(() => {})
+  }, [])
+
+  const now = Date.now()
+
   return (
-    <svg
-      width="12" height="12" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-      style={{ display: 'block', transform: up ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }}
-    >
-      <polyline points="18 15 12 9 6 15" />
-    </svg>
+    <div style={{
+      padding: '10px 16px',
+      borderBottom: '1px solid rgba(160,120,72,0.12)',
+      background: 'rgba(241,233,210,0.3)',
+    }}>
+      <p style={{ margin: '0 0 7px', fontSize: 9, color: '#a07840', fontFamily: '"Inter",sans-serif', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+        Google Fotos
+      </p>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {LABELS.map(({ label, slug }) => {
+          const row     = accounts.find(r => r.label === slug)
+          const expired = !!row && new Date(row.expires_at).getTime() < now
+          const valid   = !!row && !expired
+
+          const borderColor = valid   ? 'rgba(52,168,83,0.45)'
+                            : expired ? 'rgba(201,72,91,0.4)'
+                            :           'rgba(160,120,72,0.25)'
+          const bgColor     = valid   ? 'rgba(52,168,83,0.07)'
+                            : expired ? 'rgba(201,72,91,0.06)'
+                            :           'rgba(160,120,72,0.05)'
+          const textColor   = valid   ? '#2a7a50'
+                            : expired ? '#9a2a3a'
+                            :           '#9a8068'
+
+          return (
+            <a
+              key={slug}
+              href={!valid ? `/api/auth/google?label=${encodeURIComponent(slug)}` : undefined}
+              title={valid ? row?.email : expired ? `Token expirado — clique para reconectar` : `Conectar conta de ${label}`}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                padding: '6px 6px 5px', borderRadius: 4, textDecoration: 'none',
+                fontFamily: '"Inter",sans-serif', letterSpacing: '0.02em',
+                border: `1px solid ${borderColor}`,
+                background: bgColor,
+                color: textColor,
+                cursor: valid ? 'default' : 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                {valid ? (
+                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="2 6 5 9 10 3" />
+                  </svg>
+                ) : expired ? '!' : '+'}
+                {label}
+              </span>
+              {valid && row && (
+                <span style={{ fontSize: 9, color: '#5a9a78', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {row.email.replace(/@.*/, '')}
+                </span>
+              )}
+              {expired && (
+                <span style={{ fontSize: 9, color: '#b04050' }}>reconectar</span>
+              )}
+            </a>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
-/* ── Component ──────────────────────────────────────────── */
 export default function FloatingPinPanel() {
-  const [locked, setLocked] = useState(false)
-  const [minimized, setMinimized] = useState(false)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
+  const [open, setOpen] = useState(true)
+  const router = useRouter()
+  const interactionMode  = useMapStore((s) => s.interactionMode)
+  const setInteractionMode = useMapStore((s) => s.setInteractionMode)
 
-  /* When user releases, panel snaps to nearest screen corner */
-  const snapToCorner = useCallback(() => {
-    const panel = panelRef.current
-    if (!panel) return
+  const handleLogout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+  }, [router])
 
-    const rect = panel.getBoundingClientRect()
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const pH = rect.height
-
-    // Determine nearest corner based on panel center
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    const goRight  = cx > vw / 2
-    const goBottom = cy > vh / 2
-
-    // Natural CSS position (right: MARGIN, top: NAT_TOP → left = vw - PANEL_W - MARGIN)
-    const natLeft = vw - PANEL_W - MARGIN
-    const natTop  = NAT_TOP
-
-    let targetLeft: number
-    let targetTop: number
-
-    if ( goRight && !goBottom) { targetLeft = vw - PANEL_W - MARGIN; targetTop = MARGIN }
-    if (!goRight && !goBottom) { targetLeft = MARGIN;                 targetTop = MARGIN }
-    if ( goRight &&  goBottom) { targetLeft = vw - PANEL_W - MARGIN; targetTop = vh - pH - MARGIN }
-    if (!goRight &&  goBottom) { targetLeft = MARGIN;                 targetTop = vh - pH - MARGIN }
-
-    animate(x, targetLeft! - natLeft, { type: 'spring', stiffness: 320, damping: 28 })
-    animate(y, targetTop!  - natTop,  { type: 'spring', stiffness: 320, damping: 28 })
-  }, [x, y])
-
-  const iconBtnStyle = (active?: boolean): React.CSSProperties => ({
+  const btnStyle: React.CSSProperties = {
     flexShrink: 0,
-    background: active ? 'rgba(201,72,91,0.1)' : 'rgba(201,72,91,0.04)',
-    border: `1px solid ${active ? 'rgba(201,72,91,0.3)' : 'rgba(201,72,91,0.1)'}`,
-    borderRadius: 7,
+    background: 'rgba(160,120,72,0.07)',
+    border: '1px solid rgba(160,120,72,0.22)',
+    borderRadius: 4,
     padding: '5px 7px',
     cursor: 'pointer',
-    color: active ? 'var(--primary-color, #C9485B)' : '#9b8ca0',
+    color: '#9a8068',
     display: 'flex',
     alignItems: 'center',
     gap: 4,
     fontSize: 10,
-    fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+    fontFamily: '"Inter", sans-serif',
     transition: 'all 0.18s',
-  })
+  }
 
   return (
     <motion.div
-      ref={panelRef}
-      drag={!locked}
-      dragMomentum={false}
-      onDragEnd={snapToCorner}
+      animate={{ x: open ? 0 : SIDEBAR_W }}
+      transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       style={{
-        position: 'absolute',
-        top: NAT_TOP,
-        right: MARGIN,
+        position: 'fixed',
+        top: 0, right: 0,
+        height: '100vh',
+        width: SIDEBAR_W,
         zIndex: 500,
-        width: PANEL_W,
-        x,
-        y,
-        background: 'rgba(255,248,250,0.97)',
-        backdropFilter: 'blur(24px)',
-        border: '1px solid rgba(201,72,91,0.1)',
-        borderRadius: 16,
-        overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(100,50,80,0.14)',
-        cursor: locked ? 'default' : 'grab',
-        userSelect: 'none',
-      }}
-      whileDrag={{ scale: 1.015, boxShadow: '0 18px 50px rgba(100,50,80,0.22)', cursor: 'grabbing' }}
-    >
-      {/* Header */}
-      <div style={{
-        padding: '12px 12px 10px',
-        borderBottom: minimized ? 'none' : '1px solid rgba(201,72,91,0.08)',
         display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-      }}>
-        {!locked && <GripIcon />}
+        flexDirection: 'column',
+        background: 'rgba(253,248,238,0.97)',
+        borderLeft: '2px solid rgba(160,120,72,0.28)',
+        boxShadow: '-6px 0 32px rgba(80,50,20,0.14)',
+        // overflow visible so the tab sticks out to the left
+      }}
+    >
+      {/* ── Toggle tab ── */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title={open ? 'Recolher' : 'Expandir'}
+        style={{
+          position: 'absolute',
+          left: -33,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 33,
+          height: 72,
+          background: 'rgba(253,248,238,0.97)',
+          border: '2px solid rgba(160,120,72,0.28)',
+          borderRight: 'none',
+          borderRadius: '6px 0 0 6px',
+          cursor: 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 5,
+          color: '#9a8068',
+          boxShadow: '-4px 0 12px rgba(80,50,20,0.1)',
+          transition: 'background 0.18s, color 0.18s',
+        }}
+        onMouseEnter={(e) => {
+          const b = e.currentTarget as HTMLButtonElement
+          b.style.background = 'rgba(241,233,210,0.97)'
+          b.style.color = '#6a4e2a'
+        }}
+        onMouseLeave={(e) => {
+          const b = e.currentTarget as HTMLButtonElement
+          b.style.background = 'rgba(253,248,238,0.97)'
+          b.style.color = '#9a8068'
+        }}
+      >
+        <span style={{ fontSize: 7, color: '#a07840', letterSpacing: '0.05em', writingMode: 'vertical-rl', textTransform: 'uppercase', fontFamily: '"Inter", sans-serif', fontWeight: 600 }}>
+          ✦
+        </span>
+        {open ? <ChevronRight /> : <ChevronLeft />}
+      </button>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+      {/* ── Header ── */}
+      <div style={{
+        padding: '18px 16px 12px',
+        borderBottom: '1px solid rgba(160,120,72,0.15)',
+        background: 'rgba(241,233,210,0.5)',
+        position: 'relative',
+        flexShrink: 0,
+      }}>
+        {/* Corner ornaments */}
+        {(['tl','tr'] as const).map((pos) => {
+          const C = 'rgba(160,120,72,0.4)'
+          return (
+            <div key={pos} style={{
+              position: 'absolute', width: 12, height: 12, pointerEvents: 'none',
+              top: 6, [pos === 'tl' ? 'left' : 'right']: 6,
+              borderTop: `2px solid ${C}`,
+              [pos === 'tl' ? 'borderLeft' : 'borderRight']: `2px solid ${C}`,
+            }} />
+          )
+        })}
+
+        <div style={{ paddingRight: 44 }}>
           <h1 style={{
-            margin: 0, fontSize: 13,
-            fontFamily: 'var(--font-family, "Cormorant Garamond", serif)',
-            fontWeight: 400, color: '#2a1f2e', letterSpacing: '0.05em',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            margin: 0, fontSize: 15,
+            fontFamily: '"Cormorant Garamond", serif',
+            fontWeight: 600, color: '#2c1a0e', letterSpacing: '0.04em',
           }}>
             Viajes e Recuerdos
           </h1>
-          {!minimized && (
-            <p style={{ margin: '1px 0 0', fontSize: 10, color: '#9b8ca0', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}>
-              suas memórias pelo mundo
-            </p>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 4px' }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(160,120,72,0.28)' }} />
+            <span style={{ fontSize: 10, color: '#a07840' }}>✦</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(160,120,72,0.28)' }} />
+          </div>
+          <p style={{ margin: 0, fontSize: 10, color: '#9a8068', fontFamily: '"Inter", sans-serif', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            nossas memórias pelo mundo
+          </p>
+
+          {/* Interaction mode toggle */}
+          <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
+            {(['hand', 'pin'] as const).map((mode) => {
+              const active = interactionMode === mode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setInteractionMode(mode)}
+                  title={mode === 'hand' ? 'Arrastar globo (scroll do mouse)' : 'Adicionar pin (scroll do mouse)'}
+                  style={{
+                    flex: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    padding: '5px 8px',
+                    borderRadius: 4,
+                    border: `1px solid ${active ? 'rgba(160,120,72,0.55)' : 'rgba(160,120,72,0.2)'}`,
+                    background: active ? 'rgba(160,120,72,0.14)' : 'rgba(160,120,72,0.04)',
+                    color: active ? '#6a4e2a' : '#9a8068',
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    fontFamily: '"Inter", sans-serif',
+                    fontWeight: active ? 600 : 400,
+                    letterSpacing: '0.04em',
+                    transition: 'all 0.18s',
+                  }}
+                >
+                  {mode === 'hand' ? (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2" />
+                      <path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2" />
+                      <path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8" />
+                      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                    </svg>
+                  ) : (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  )}
+                  {mode === 'hand' ? 'Arrastar' : 'Adicionar'}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        {/* Minimize */}
-        <button
-          onClick={() => setMinimized((m) => !m)}
-          title={minimized ? 'Expandir' : 'Minimizar'}
-          style={iconBtnStyle()}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)' }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)' }}
-        >
-          <ChevronIcon up={!minimized} />
-        </button>
-
-        {/* Lock */}
-        <button
-          onClick={() => setLocked((l) => !l)}
-          title={locked ? 'Liberar painel' : 'Fixar painel'}
-          style={iconBtnStyle(locked)}
-          onMouseEnter={(e) => {
-            if (!locked) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'
-          }}
-          onMouseLeave={(e) => {
-            if (!locked) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'
-          }}
-        >
-          {locked ? <LockClosedIcon /> : <LockOpenIcon />}
-          <span>{locked ? 'Fixo' : 'Livre'}</span>
-        </button>
+        {/* Logout button */}
+        <div style={{ position: 'absolute', top: 12, right: 12 }}>
+          <button
+            onClick={handleLogout}
+            title="Sair"
+            style={btnStyle}
+            onMouseEnter={(e) => {
+              const b = e.currentTarget as HTMLButtonElement
+              b.style.background = 'rgba(201,72,91,0.1)'
+              b.style.color = '#C9485B'
+              b.style.borderColor = 'rgba(201,72,91,0.35)'
+            }}
+            onMouseLeave={(e) => {
+              const b = e.currentTarget as HTMLButtonElement
+              b.style.background = 'rgba(160,120,72,0.07)'
+              b.style.color = '#9a8068'
+              b.style.borderColor = 'rgba(160,120,72,0.22)'
+            }}
+          >
+            <LogoutIcon />
+          </button>
+        </div>
       </div>
 
-      {/* Collapsible body */}
-      <AnimatePresence initial={false}>
-        {!minimized && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-            style={{ overflow: 'hidden' }}
-          >
-            <StatsBar />
-            <PinList />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Google accounts ── */}
+      <GoogleAccountsBar />
+
+      {/* ── Scrollable body ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <StatsBar />
+        <PinList />
+      </div>
     </motion.div>
   )
 }

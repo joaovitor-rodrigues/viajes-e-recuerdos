@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(cached.data)
   }
 
-  const now = Date.now()
-  const elapsed = now - lastRequestAt
-  if (elapsed < 1000) {
-    await new Promise((r) => setTimeout(r, 1000 - elapsed))
+  // Light throttle — Photon is fast, but protect the Nominatim fallback
+  const elapsed = Date.now() - lastRequestAt
+  if (elapsed < 200) {
+    await new Promise((r) => setTimeout(r, 200 - elapsed))
   }
   lastRequestAt = Date.now()
 

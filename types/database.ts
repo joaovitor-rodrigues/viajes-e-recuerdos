@@ -13,10 +13,11 @@ export interface Pin {
   country: string
   title: string
   description: string | null
-  pin_date: string
+  start_date: string
+  end_date: string
   media: MediaItem[]
   color: string
-  icon: string
+  icon?: string | null
   created_at: string
   updated_at: string
 }

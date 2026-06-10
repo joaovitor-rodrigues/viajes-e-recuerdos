@@ -50,7 +50,7 @@ export default function CitySearchBox() {
   const [hovered, setHovered] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const debouncedQuery = useDebounce(query, 400)
+  const debouncedQuery = useDebounce(query, 200)
   const { flyTo, startCreation } = useMapStore()
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function CitySearchBox() {
     (city: GeocodingResult) => {
       setQuery(city.displayName)
       setOpen(false)
-      flyTo(city.lat, city.lng, 12)
+      flyTo(city.lat, city.lng, 11)
       startCreation({ lat: city.lat, lng: city.lng }, city)
     },
     [flyTo, startCreation]
@@ -132,7 +132,7 @@ export default function CitySearchBox() {
         <span style={{
           position: 'absolute',
           left: 16,
-          color: isActive ? 'var(--primary-color, #C9485B)' : '#9b8ca0',
+          color: isActive ? '#C9485B' : '#9a8068',
           pointerEvents: 'none',
           transition: 'color 0.2s',
           display: 'flex',
@@ -155,9 +155,9 @@ export default function CitySearchBox() {
             border: isActive
               ? '1.5px solid rgba(201,72,91,0.4)'
               : '1.5px solid rgba(201,72,91,0.12)',
-            background: 'rgba(255,248,250,0.97)',
+            background: 'rgba(249,243,232,0.97)',
             backdropFilter: 'blur(24px)',
-            color: '#2a1f2e',
+            color: '#2c1a0e',
             fontSize: 14,
             fontFamily: 'var(--font-inter, "Inter", sans-serif)',
             outline: 'none',
@@ -186,7 +186,7 @@ export default function CitySearchBox() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#9b8ca0',
+              color: '#9a8068',
               cursor: 'pointer',
               padding: 0,
               transition: 'background 0.15s',
@@ -206,7 +206,7 @@ export default function CitySearchBox() {
             listStyle: 'none',
             margin: '6px 0 0',
             padding: 0,
-            background: 'rgba(255,248,250,0.98)',
+            background: 'rgba(249,243,232,0.98)',
             backdropFilter: 'blur(24px)',
             border: '1px solid rgba(201,72,91,0.1)',
             borderRadius: 16,
@@ -217,7 +217,7 @@ export default function CitySearchBox() {
           {loading && (
             <li style={{
               padding: '12px 18px',
-              color: '#9b8ca0',
+              color: '#9a8068',
               fontSize: 13,
               fontFamily: 'var(--font-inter, "Inter", sans-serif)',
             }}>
@@ -232,7 +232,7 @@ export default function CitySearchBox() {
                 padding: '11px 18px',
                 cursor: 'pointer',
                 fontSize: 13,
-                color: '#2a1f2e',
+                color: '#2c1a0e',
                 fontFamily: 'var(--font-inter, "Inter", sans-serif)',
                 borderBottom: i < results.length - 1 ? '1px solid rgba(201,72,91,0.07)' : 'none',
                 transition: 'background 0.12s',
@@ -247,14 +247,14 @@ export default function CitySearchBox() {
                 (e.currentTarget as HTMLLIElement).style.background = 'transparent'
               }}
             >
-              <span style={{ color: '#9b8ca0', flexShrink: 0 }}>
+              <span style={{ color: '#9a8068', flexShrink: 0 }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                 </svg>
               </span>
               <div>
                 <div style={{ fontWeight: 500 }}>{r.city || r.displayName.split(',')[0]}</div>
-                <div style={{ fontSize: 11, color: '#9b8ca0', marginTop: 1 }}>
+                <div style={{ fontSize: 11, color: '#9a8068', marginTop: 1 }}>
                   {[r.state, r.country].filter(Boolean).join(', ')}
                 </div>
               </div>

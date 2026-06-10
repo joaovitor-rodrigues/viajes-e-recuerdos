@@ -19,7 +19,7 @@ export default async function MapaPage() {
   const supabase = await createServerClient()
 
   const [{ data: pins }, { data: theme }] = await Promise.all([
-    supabase.from('pins').select('*').order('pin_date', { ascending: false }),
+    supabase.from('pins').select('*').order('start_date', { ascending: false }),
     supabase.from('visual_theme').select('*').eq('id', 1).single(),
   ])
 

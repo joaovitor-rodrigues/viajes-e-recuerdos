@@ -3,15 +3,15 @@ import type { VisualTheme } from '@/types/database'
 
 export const DEFAULT_THEME: VisualTheme = {
   id: 1,
-  primary_color: '#C9485B',
-  secondary_color: '#4ECDC4',
-  background_color: '#0f0f1a',
-  text_color: '#f0ece4',
-  map_style: 'dark',
-  enable_particles: true,
-  enable_glow: true,
+  primary_color:    '#C9485B',
+  secondary_color:  '#8a6030',
+  background_color: '#f5ede0',
+  text_color:       '#2c1a0e',
+  map_style:        'watercolor',
+  enable_particles: false,
+  enable_glow:      false,
   enable_animations: true,
-  font_family: 'Inter',
+  font_family:      'Cormorant Garamond',
   sidebar_position: 'right',
   updated_at: '',
 }

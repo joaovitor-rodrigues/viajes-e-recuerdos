@@ -1,45 +1,42 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useForm, useFieldArray } from 'react-hook-form'
-import { useRouter } from 'next/navigation'
+import { useEffect, forwardRef, useImperativeHandle, useState } from 'react'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
+import DatePicker from './DatePicker'
+import dynamic from 'next/dynamic'
+import type { AccountLabel } from '@/lib/googlePhotos'
+
+const GooglePhotosPicker = dynamic(() => import('./GooglePhotosPicker'), { ssr: false })
 import { usePins } from '@/hooks/usePins'
 import { useMapStore } from '@/stores/mapStore'
 import { PinSchema, type PinInput } from '@/lib/validations'
+import { getFlagColor } from '@/lib/flagColors'
 import MediaInput from './MediaInput'
-
-const COLOR_SWATCHES = [
-  '#C9485B','#E8956D','#F5C842','#6DB88A','#4ECDC4',
-  '#5B8DD9','#8B6DC9','#C96D9E','#8B4513','#2C3E50','#E74C3C','#FFFFFF',
-]
-
-const EMOJI_OPTIONS = [
-  '💕','✈️','🏠','🌟','🎂','🌅','🍽️','🏖️','🎵','📸','🌍','🏔️','🎭','☕','🌊',
-]
+import type { Pin } from '@/types/database'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
 const INPUT_STYLE: React.CSSProperties = {
   width: '100%',
-  padding: '9px 12px',
-  borderRadius: 10,
-  border: '1px solid rgba(150,120,200,0.25)',
-  background: 'rgba(255,255,255,0.7)',
-  color: '#1a1730',
+  padding: '8px 12px',
+  borderRadius: 4,
+  border: '1px solid rgba(160,120,72,0.2)',
+  background: 'rgba(241,233,215,0.5)',
+  color: '#2c1a0e',
   fontSize: 13,
   outline: 'none',
   boxSizing: 'border-box',
   fontFamily: 'var(--font-inter, "Inter", sans-serif)',
-  transition: 'border-color 0.18s',
+  transition: 'border-color 0.18s, box-shadow 0.18s',
 }
 
 const LABEL_STYLE: React.CSSProperties = {
   display: 'block',
-  fontSize: 11,
-  color: '#9b93b4',
+  fontSize: 10,
+  color: '#9a8068',
   marginBottom: 5,
   textTransform: 'uppercase',
-  letterSpacing: '0.07em',
+  letterSpacing: '0.08em',
   fontWeight: 600,
   fontFamily: 'var(--font-inter, "Inter", sans-serif)',
 }
@@ -47,13 +44,13 @@ const LABEL_STYLE: React.CSSProperties = {
 const SECTION_STYLE: React.CSSProperties = {
   marginBottom: 22,
   paddingBottom: 22,
-  borderBottom: '1px solid rgba(150,120,200,0.12)',
+  borderBottom: '1px solid rgba(160,120,72,0.13)',
 }
 
 const SECTION_TITLE: React.CSSProperties = {
   margin: '0 0 14px',
-  fontSize: 11,
-  color: '#C9485B',
+  fontSize: 10,
+  color: '#a07840',
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
   fontWeight: 700,
@@ -62,9 +59,15 @@ const SECTION_TITLE: React.CSSProperties = {
 
 const ERROR_STYLE: React.CSSProperties = {
   fontSize: 11,
-  color: '#E74C3C',
+  color: '#8b3a30',
   marginTop: 3,
   fontFamily: 'var(--font-inter, "Inter", sans-serif)',
+}
+
+export interface PinEditFormHandle {
+  isDirty: boolean
+  getValues: () => Partial<PinInput>
+  reset: (values: Partial<PinInput>) => void
 }
 
 interface Props {
@@ -73,27 +76,38 @@ interface Props {
   pinId?: string
   onCancel: () => void
   onSuccess?: () => void
+  updatePin?: (id: string, data: PinInput) => Promise<Pin | null>
 }
 
-export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSuccess }: Props) {
-  const router = useRouter()
-  const { createPin, updatePin } = usePins()
+const PinEditForm = forwardRef<PinEditFormHandle, Props>(function PinEditForm(
+  { mode, initialValues, pinId, onCancel, onSuccess, updatePin: updatePinProp },
+  ref,
+) {
+  const { createPin, updatePin: updatePinHook } = usePins()
+  const updatePin = updatePinProp ?? updatePinHook
   const creationPosition = useMapStore((s) => s.creationPosition)
 
   const {
-    register, handleSubmit, watch, setValue, control,
-    formState: { isSubmitting, errors },
+    register, handleSubmit, watch, setValue, control, reset,
+    getValues,
+    formState: { isSubmitting, errors, isDirty },
   } = useForm<PinInput>({
     defaultValues: {
       latitude: 0, longitude: 0,
       city: '', state: '', country: '',
-      title: '', description: '', pin_date: TODAY,
-      media: [], color: '#C9485B', icon: '💕',
+      title: '', description: '', start_date: TODAY, end_date: TODAY,
+      media: [], color: '#C9485B',
       ...initialValues,
     },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'media' })
+
+  useImperativeHandle(ref, () => ({
+    isDirty,
+    getValues,
+    reset: (values) => reset({ ...getValues(), ...values } as PinInput),
+  }), [isDirty, getValues, reset])
 
   useEffect(() => {
     if (mode === 'create' && creationPosition) {
@@ -102,9 +116,24 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
     }
   }, [creationPosition, mode, setValue])
 
-  const selectedColor = watch('color')
-  const selectedIcon  = watch('icon')
-  const mediaValues   = watch('media')
+  type PickerState = { filter: 'image' | 'video'; label: AccountLabel } | null
+  const [photosPicker,  setPhotosPicker]  = useState<PickerState>(null)
+  const [photosChooser, setPhotosChooser] = useState<'image' | 'video' | null>(null)
+  const [pickerError,   setPickerError]   = useState<string | null>(null)
+
+  const country    = watch('country')
+  const startDate  = watch('start_date')
+  const mediaValues = watch('media')
+
+  useEffect(() => {
+    if (country) setValue('color', getFlagColor(country))
+  }, [country, setValue])
+
+  useEffect(() => {
+    if (!startDate) return
+    const end = getValues('end_date')
+    if (end && end < startDate) setValue('end_date', startDate, { shouldDirty: true })
+  }, [startDate, getValues, setValue])
 
   async function onSubmit(data: PinInput) {
     const parsed = PinSchema.safeParse(data)
@@ -112,26 +141,33 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
 
     if (mode === 'create') {
       const pin = await createPin(parsed.data)
-      if (pin) { onSuccess?.(); router.push(`/pin/${pin.id}`) }
+      if (pin) onSuccess?.()
     } else if (mode === 'edit' && pinId) {
       const pin = await updatePin(pinId, parsed.data)
-      if (pin) { onSuccess?.(); router.push(`/pin/${pinId}`) }
+      if (pin) onSuccess?.()
     }
   }
 
   const focusStyle = {
     onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      e.currentTarget.style.borderColor = '#C9485B'
-      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(201,72,91,0.1)'
+      e.currentTarget.style.borderColor = 'rgba(160,120,72,0.5)'
+      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(160,120,72,0.1)'
     },
     onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      e.currentTarget.style.borderColor = 'rgba(150,120,200,0.25)'
+      e.currentTarget.style.borderColor = 'rgba(160,120,72,0.2)'
       e.currentTarget.style.boxShadow = 'none'
     },
   }
 
+  const addBtnStyle: React.CSSProperties = {
+    padding: '6px 16px', borderRadius: 3, fontSize: 11, cursor: 'pointer',
+    background: 'rgba(160,120,72,0.07)', border: '1px solid rgba(160,120,72,0.25)',
+    color: '#6a4e2a', fontFamily: 'var(--font-inter, "Inter", sans-serif)', fontWeight: 500,
+    transition: 'background 0.15s',
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} style={{ color: '#1a1730' }}>
+    <form onSubmit={handleSubmit(onSubmit)} style={{ color: '#2c1a0e' }}>
 
       {/* A — Localização */}
       <div style={SECTION_STYLE}>
@@ -156,7 +192,7 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
             <input
               {...register('latitude', { valueAsNumber: true })}
               readOnly
-              style={{ ...INPUT_STYLE, background: 'rgba(150,120,200,0.05)', color: '#b0a8c8' }}
+              style={{ ...INPUT_STYLE, background: 'rgba(160,120,72,0.05)', color: '#b0a090' }}
             />
           </div>
           <div>
@@ -164,7 +200,7 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
             <input
               {...register('longitude', { valueAsNumber: true })}
               readOnly
-              style={{ ...INPUT_STYLE, background: 'rgba(150,120,200,0.05)', color: '#b0a8c8' }}
+              style={{ ...INPUT_STYLE, background: 'rgba(160,120,72,0.05)', color: '#b0a090' }}
             />
           </div>
         </div>
@@ -180,9 +216,30 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
             {errors.title && <p style={ERROR_STYLE}>{errors.title.message}</p>}
           </div>
           <div>
-            <label style={LABEL_STYLE}>Data *</label>
-            <input type="date" {...register('pin_date')} max={TODAY} style={INPUT_STYLE} {...focusStyle} />
-            {errors.pin_date && <p style={ERROR_STYLE}>{errors.pin_date.message}</p>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={LABEL_STYLE}>Início *</label>
+                <Controller
+                  control={control}
+                  name="start_date"
+                  render={({ field }) => (
+                    <DatePicker value={field.value} onChange={field.onChange} max={TODAY} />
+                  )}
+                />
+                {errors.start_date && <p style={ERROR_STYLE}>{errors.start_date.message}</p>}
+              </div>
+              <div>
+                <label style={LABEL_STYLE}>Fim *</label>
+                <Controller
+                  control={control}
+                  name="end_date"
+                  render={({ field }) => (
+                    <DatePicker value={field.value} onChange={field.onChange} min={startDate} max={TODAY} />
+                  )}
+                />
+                {errors.end_date && <p style={ERROR_STYLE}>{errors.end_date.message}</p>}
+              </div>
+            </div>
           </div>
           <div>
             <label style={LABEL_STYLE}>Descrição</label>
@@ -191,8 +248,8 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
               maxLength={5000}
               rows={4}
               style={{ ...INPUT_STYLE, resize: 'vertical', fontFamily: 'var(--font-inter, "Inter", sans-serif)' }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = '#C9485B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(201,72,91,0.1)' }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(150,120,200,0.25)'; e.currentTarget.style.boxShadow = 'none' }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(160,120,72,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(160,120,72,0.1)' }}
+              onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(160,120,72,0.2)';  e.currentTarget.style.boxShadow = 'none' }}
             />
           </div>
         </div>
@@ -212,18 +269,14 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
             />
           ) : null
         )}
-        <button
-          type="button"
+        <DrivePickerButtons
+          filter="image"
+          photosChooser={photosChooser}
+          setPhotosChooser={setPhotosChooser}
           disabled={fields.length >= 20}
-          onClick={() => append({ url: '', caption: '', type: 'image' })}
-          style={{
-            padding: '7px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
-            background: 'rgba(78,205,196,0.08)', border: '1px solid rgba(78,205,196,0.3)',
-            color: '#2a9e98', fontFamily: 'var(--font-inter, "Inter", sans-serif)', fontWeight: 500,
-          }}
-        >
-          + Adicionar foto
-        </button>
+          onGPhotos={(label) => { setPhotosChooser(null); setPhotosPicker({ filter: 'image', label }) }}
+          addBtnStyle={addBtnStyle}
+        />
       </div>
 
       {/* D — Vídeos */}
@@ -240,67 +293,38 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
             />
           ) : null
         )}
-        <button
-          type="button"
+        <DrivePickerButtons
+          filter="video"
+          photosChooser={photosChooser}
+          setPhotosChooser={setPhotosChooser}
           disabled={fields.length >= 20}
-          onClick={() => append({ url: '', caption: '', type: 'video' })}
-          style={{
-            padding: '7px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
-            background: 'rgba(78,205,196,0.08)', border: '1px solid rgba(78,205,196,0.3)',
-            color: '#2a9e98', fontFamily: 'var(--font-inter, "Inter", sans-serif)', fontWeight: 500,
+          onGPhotos={(label) => { setPhotosChooser(null); setPhotosPicker({ filter: 'video', label }) }}
+          addBtnStyle={addBtnStyle}
+        />
+      </div>
+
+      <input type="hidden" {...register('color')} />
+
+      {pickerError && (
+        <p style={{ margin: '0 0 8px', fontSize: 11, color: '#8b3a30', fontFamily: '"Inter",sans-serif' }}>
+          {pickerError}
+        </p>
+      )}
+
+      {photosPicker && (
+        <GooglePhotosPicker
+          label={photosPicker.label}
+          filter={photosPicker.filter}
+          onConfirm={(items) => {
+            items.forEach(item => {
+              const type = item.mimeType.startsWith('video/') ? 'video' : 'image'
+              append({ url: item.url, caption: item.filename, type })
+            })
+            setPhotosPicker(null)
           }}
-        >
-          + Adicionar vídeo
-        </button>
-      </div>
-
-      {/* E — Identidade visual */}
-      <div style={SECTION_STYLE}>
-        <h3 style={SECTION_TITLE}>Identidade Visual</h3>
-
-        <label style={LABEL_STYLE}>Cor do pin</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 10 }}>
-          {COLOR_SWATCHES.map((c) => (
-            <button
-              key={c} type="button"
-              onClick={() => setValue('color', c)}
-              style={{
-                width: 28, height: 28, borderRadius: '50%', background: c, border: 'none',
-                cursor: 'pointer',
-                outline: selectedColor === c ? `3px solid ${c}` : '2px solid transparent',
-                outlineOffset: 2,
-                transform: selectedColor === c ? 'scale(1.2)' : 'scale(1)',
-                transition: 'transform 0.15s',
-                boxShadow: selectedColor === c ? `0 0 8px ${c}80` : 'none',
-              }}
-            />
-          ))}
-          <input
-            {...register('color')}
-            placeholder="#RRGGBB"
-            style={{ ...INPUT_STYLE, width: 90, padding: '5px 8px' }}
-          />
-        </div>
-
-        <label style={{ ...LABEL_STYLE, marginTop: 14 }}>Ícone</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {EMOJI_OPTIONS.map((e) => (
-            <button
-              key={e} type="button"
-              onClick={() => setValue('icon', e)}
-              style={{
-                width: 38, height: 38, borderRadius: 10, fontSize: 19,
-                background: selectedIcon === e ? 'rgba(201,72,91,0.12)' : 'rgba(150,120,200,0.06)',
-                border: selectedIcon === e ? '1.5px solid rgba(201,72,91,0.5)' : '1px solid rgba(150,120,200,0.2)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'all 0.15s',
-              }}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      </div>
+          onClose={() => setPhotosPicker(null)}
+        />
+      )}
 
       {/* F — Botões */}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -308,13 +332,13 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
           type="button"
           onClick={onCancel}
           style={{
-            padding: '10px 22px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-            background: 'transparent',
-            border: '1px solid rgba(150,120,200,0.3)',
-            color: '#7b6fa0',
-            fontFamily: 'var(--font-inter, "Inter", sans-serif)',
-            fontWeight: 500,
+            padding: '8px 20px', borderRadius: 3, fontSize: 12, cursor: 'pointer',
+            background: 'transparent', border: '1px solid rgba(160,120,72,0.3)',
+            color: '#7a6050', fontFamily: 'var(--font-inter, "Inter", sans-serif)', fontWeight: 500,
+            transition: 'background 0.15s',
           }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(160,120,72,0.07)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
         >
           Cancelar
         </button>
@@ -322,17 +346,76 @@ export default function PinEditForm({ mode, initialValues, pinId, onCancel, onSu
           type="submit"
           disabled={isSubmitting}
           style={{
-            padding: '10px 22px', borderRadius: 20, fontSize: 13,
+            padding: '8px 20px', borderRadius: 3, fontSize: 12,
             cursor: isSubmitting ? 'not-allowed' : 'pointer',
             background: isSubmitting ? 'rgba(201,72,91,0.4)' : '#C9485B',
             border: 'none', color: '#fff', fontWeight: 600,
             fontFamily: 'var(--font-inter, "Inter", sans-serif)',
-            boxShadow: isSubmitting ? 'none' : '0 4px 16px rgba(201,72,91,0.3)',
+            letterSpacing: '0.04em',
+            boxShadow: isSubmitting ? 'none' : '0 3px 12px rgba(201,72,91,0.28)',
+            transition: 'box-shadow 0.15s',
           }}
         >
           {isSubmitting ? 'Salvando...' : 'Salvar memória'}
         </button>
       </div>
     </form>
+  )
+})
+
+export default PinEditForm
+
+// ── Botões de seleção de mídia ────────────────────────────────────────────
+function DrivePickerButtons({
+  filter, photosChooser, setPhotosChooser,
+  disabled, onGPhotos, addBtnStyle,
+}: {
+  filter:           'image' | 'video'
+  photosChooser:    'image' | 'video' | null
+  setPhotosChooser: (v: 'image' | 'video' | null) => void
+  disabled:         boolean
+  onGPhotos:        (label: AccountLabel) => void
+  addBtnStyle:      React.CSSProperties
+}) {
+  const icon         = filter === 'image' ? '📷' : '🎬'
+  const isPhotosOpen = photosChooser === filter
+
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+      {isPhotosOpen ? (
+        <>
+          <span style={{ fontSize: 10, color: '#a07840', fontFamily: '"Inter",sans-serif' }}>Conta:</span>
+          {(['joão', 'jéssica'] as AccountLabel[]).map(lbl => (
+            <button
+              key={lbl} type="button"
+              onClick={() => onGPhotos(lbl)}
+              style={{ ...addBtnStyle, color: '#34a853', borderColor: 'rgba(52,168,83,0.4)', textTransform: 'capitalize' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(52,168,83,0.1)' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(160,120,72,0.07)' }}
+            >
+              {lbl}
+            </button>
+          ))}
+          <button
+            type="button" onClick={() => setPhotosChooser(null)}
+            style={{ ...addBtnStyle, padding: '5px 8px' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(160,120,72,0.14)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(160,120,72,0.07)' }}
+          >
+            ✕
+          </button>
+        </>
+      ) : (
+        <button
+          type="button" disabled={disabled}
+          onClick={() => setPhotosChooser(filter)}
+          style={{ ...addBtnStyle, color: '#34a853', borderColor: 'rgba(52,168,83,0.35)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(52,168,83,0.09)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(160,120,72,0.07)' }}
+        >
+          {icon} Google Fotos
+        </button>
+      )}
+    </div>
   )
 }

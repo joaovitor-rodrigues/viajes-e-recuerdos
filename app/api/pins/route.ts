@@ -8,7 +8,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('pins')
     .select('*')
-    .order('pin_date', { ascending: false })
+    .order('start_date', { ascending: false })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

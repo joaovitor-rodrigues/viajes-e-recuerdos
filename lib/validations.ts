@@ -8,7 +8,8 @@ export const PinSchema = z.object({
   country:     z.string().min(1).max(200),
   title:       z.string().min(1).max(300),
   description: z.string().max(5000).optional().nullable(),
-  pin_date:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida — use YYYY-MM-DD'),
+  start_date:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida — use YYYY-MM-DD'),
+  end_date:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida — use YYYY-MM-DD'),
   media:       z.array(
     z.object({
       url:     z.string().url(),
@@ -17,7 +18,6 @@ export const PinSchema = z.object({
     })
   ).max(20),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Cor inválida — use #RRGGBB'),
-  icon:  z.string().min(1).max(10),
 })
 
 export const PinUpdateSchema = PinSchema.partial()

@@ -47,7 +47,7 @@ function createPinIcon(color: string, icon: string, glow: boolean): L.DivIcon {
 
 export default function MapPin({ pin, enableGlow }: Props) {
   const router = useRouter()
-  const icon = createPinIcon(pin.color, pin.icon, enableGlow)
+  const icon = createPinIcon(pin.color, pin.icon ?? '', enableGlow)
 
   return (
     <Marker

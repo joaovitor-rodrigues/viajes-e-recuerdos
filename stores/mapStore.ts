@@ -1,33 +1,47 @@
 import { create } from 'zustand'
 import type { GeocodingResult } from '@/lib/geocoding'
+import type { Pin } from '@/types/database'
 
 interface CreationPosition {
   lat: number
   lng: number
 }
 
-interface GlobeInstance {
-  pointOfView: (pov: { lat: number; lng: number; altitude?: number }, ms?: number) => void
+interface MapInstance {
+  flyTo: (opts: { center: [number, number]; zoom: number; duration: number }) => void
 }
 
 interface MapStore {
-  globeRef: GlobeInstance | null
+  mapRef: MapInstance | null
   creationMode: boolean
   creationPosition: CreationPosition | null
   prefilledCity: GeocodingResult | null
-  setGlobeRef: (globe: GlobeInstance) => void
+  selectedPin: Pin | null
+  editingPin: Pin | null
+  interactionMode: 'hand' | 'pin'
+
+  setMapRef: (map: MapInstance) => void
   startCreation: (position: CreationPosition, city: GeocodingResult) => void
   endCreation: () => void
   flyTo: (lat: number, lng: number, zoom?: number) => void
+  selectPin: (pin: Pin | null) => void
+  startEditing: (pin: Pin) => void   // detail → edit (atomic: clears selectedPin)
+  resumeDetail: () => void            // edit → detail (atomic: restores editingPin as selectedPin)
+  stopEditing: () => void             // edit → clean map
+  setInteractionMode: (mode: 'hand' | 'pin') => void
+  toggleInteractionMode: () => void
 }
 
 export const useMapStore = create<MapStore>((set, get) => ({
-  globeRef: null,
+  mapRef: null,
   creationMode: false,
   creationPosition: null,
   prefilledCity: null,
+  selectedPin: null,
+  editingPin: null,
+  interactionMode: 'hand',
 
-  setGlobeRef: (globe) => set({ globeRef: globe }),
+  setMapRef: (map) => set({ mapRef: map }),
 
   startCreation: (position, city) =>
     set({ creationMode: true, creationPosition: position, prefilledCity: city }),
@@ -36,7 +50,18 @@ export const useMapStore = create<MapStore>((set, get) => ({
     set({ creationMode: false, creationPosition: null, prefilledCity: null }),
 
   flyTo: (lat, lng, zoom = 5) => {
-    const altitude = zoom >= 10 ? 0.5 : 2.0
-    get().globeRef?.pointOfView({ lat, lng, altitude }, 1500)
+    get().mapRef?.flyTo({ center: [lng, lat], zoom, duration: 1500 })
   },
+
+  selectPin: (pin) => set({ selectedPin: pin }),
+
+  startEditing: (pin) => set({ editingPin: pin, selectedPin: null }),
+
+  resumeDetail: () => set((s) => ({ selectedPin: s.editingPin, editingPin: null })),
+
+  stopEditing: () => set({ editingPin: null }),
+
+  setInteractionMode: (mode) => set({ interactionMode: mode }),
+  toggleInteractionMode: () =>
+    set((s) => ({ interactionMode: s.interactionMode === 'hand' ? 'pin' : 'hand' })),
 }))

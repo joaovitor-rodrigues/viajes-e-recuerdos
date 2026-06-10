@@ -14,6 +14,26 @@ function applyCSSVars(theme: VisualTheme) {
   root.style.setProperty('--font-family',     `'${theme.font_family}', serif`)
 }
 
+// Module-level subscription — runs once per page load, immune to Strict Mode double-invoke
+let themeSubscribed = false
+
+function subscribeToTheme() {
+  if (themeSubscribed) return
+  themeSubscribed = true
+
+  const supabase = createClient()
+  supabase
+    .channel('visual_theme')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'visual_theme', filter: 'id=eq.1' },
+      (payload) => {
+        useThemeStore.getState().updateTheme(payload.new as Partial<VisualTheme>)
+      }
+    )
+    .subscribe()
+}
+
 export function useTheme(initialTheme?: VisualTheme | null) {
   const { theme, setTheme, updateTheme } = useThemeStore()
 
@@ -25,22 +45,9 @@ export function useTheme(initialTheme?: VisualTheme | null) {
     applyCSSVars(theme)
   }, [theme])
 
-  // Realtime subscription for visual_theme updates
   useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel('visual_theme')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'visual_theme', filter: 'id=eq.1' },
-        (payload) => {
-          updateTheme(payload.new as Partial<VisualTheme>)
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    subscribeToTheme()
+  }, [])
 
   async function updateAndSync(partial: Partial<VisualTheme>) {
     updateTheme(partial)

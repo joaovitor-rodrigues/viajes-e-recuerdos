@@ -1,41 +1,26 @@
 'use client'
 
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import Map, { Marker } from 'react-map-gl/maplibre'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { motion } from 'framer-motion'
-import type { Pin, VisualTheme } from '@/types/database'
+import { useMapStore } from '@/stores/mapStore'
+import type { Pin } from '@/types/database'
 
-const TILE_URLS: Record<string, string> = {
-  dark:       'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light:      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  watercolor: 'https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg',
-  minimal:    'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-  osm:        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-}
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 
 interface Props {
   pin: Pin
-  theme: VisualTheme | null
+  onNavigate?: () => void
+  theme?: unknown
 }
 
-export default function PinMiniMap({ pin, theme }: Props) {
-  const tileUrl = TILE_URLS[theme?.map_style ?? 'dark'] ?? TILE_URLS.dark
+export default function PinMiniMap({ pin, onNavigate }: Props) {
+  const { flyTo } = useMapStore()
 
-  const icon = L.divIcon({
-    className: '',
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-    html: `
-      <div style="
-        width:40px;height:40px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-        background:${pin.color};display:flex;align-items:center;justify-content:center;
-        box-shadow:0 0 8px 3px ${pin.color}88;
-      ">
-        <span style="transform:rotate(45deg);font-size:18px;line-height:1;">${pin.icon}</span>
-      </div>
-    `,
-  })
+  function handleClick() {
+    flyTo(pin.latitude, pin.longitude, 13)
+    onNavigate?.()
+  }
 
   return (
     <motion.section
@@ -44,23 +29,57 @@ export default function PinMiniMap({ pin, theme }: Props) {
       transition={{ duration: 0.5, delay: 0.4 }}
       style={{ marginBottom: 40 }}
     >
-      <h2 style={{ margin: '0 0 12px', fontSize: 14, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-        Localização no mapa
-      </h2>
-      <div style={{ height: 300, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <MapContainer
-          center={[pin.latitude, pin.longitude]}
-          zoom={12}
-          style={{ height: '100%', width: '100%' }}
-          dragging={false}
-          scrollWheelZoom={false}
-          doubleClickZoom={false}
-          zoomControl={false}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <span style={{
+          fontSize: 10, color: '#a07840', textTransform: 'uppercase',
+          letterSpacing: '0.12em', fontWeight: 600, fontFamily: '"Inter", sans-serif',
+        }}>
+          Localização
+        </span>
+        <div style={{ flex: 1, height: 1, background: 'rgba(160,120,72,0.25)' }} />
+        <span style={{ fontSize: 10, color: '#a07840' }}>✦</span>
+      </div>
+
+      <div
+        onClick={handleClick}
+        title="Ver no mapa"
+        style={{
+          height: 280,
+          borderRadius: 4,
+          overflow: 'hidden',
+          border: '2px solid rgba(160,120,72,0.28)',
+          boxShadow: '0 3px 16px rgba(80,50,20,0.1)',
+          cursor: 'pointer',
+          position: 'relative',
+        }}
+      >
+        <Map
+          initialViewState={{ latitude: pin.latitude, longitude: pin.longitude, zoom: 13 }}
+          style={{ width: '100%', height: '100%' }}
+          mapStyle={MAP_STYLE_URL}
+          interactive={false}
           attributionControl={false}
         >
-          <TileLayer url={tileUrl} />
-          <Marker position={[pin.latitude, pin.longitude]} icon={icon} />
-        </MapContainer>
+          <Marker latitude={pin.latitude} longitude={pin.longitude} anchor="center">
+            <div style={{
+              width: 14, height: 14, borderRadius: '50%',
+              background: pin.color ?? '#C9485B',
+              border: '2.5px solid rgba(255,255,255,0.9)',
+              boxShadow: '0 2px 6px rgba(44,26,14,0.4)',
+            }} />
+          </Marker>
+        </Map>
+
+        <div style={{
+          position: 'absolute', bottom: 8, right: 8, pointerEvents: 'none',
+          background: 'rgba(253,248,238,0.88)',
+          border: '1px solid rgba(160,120,72,0.3)',
+          borderRadius: 3, padding: '3px 8px',
+          fontSize: 10, color: '#6a4e2a',
+          fontFamily: '"Inter", sans-serif', letterSpacing: '0.04em',
+        }}>
+          Ver no globo →
+        </div>
       </div>
     </motion.section>
   )

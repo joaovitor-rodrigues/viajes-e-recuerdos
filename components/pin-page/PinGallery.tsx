@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { getDirectImageUrl, validateAndParseMediaUrl } from '@/lib/drive'
+import { validateAndParseMediaUrl } from '@/lib/drive'
+import { isGPhotosUrl } from '@/lib/googlePhotos'
+import { useResolvedMedia } from '@/hooks/useResolvedMedia'
 import type { MediaItem } from '@/types/database'
 
 interface Props {
@@ -78,6 +80,7 @@ function Lightbox({ photos, startIndex, onClose }: LightboxProps) {
         </button>
 
         <div style={{ flex: 1, textAlign: 'center' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={photos[index].src}
             alt={photos[index].caption}
@@ -99,16 +102,69 @@ function Lightbox({ photos, startIndex, onClose }: LightboxProps) {
   )
 }
 
+interface PhotoItemProps {
+  item: MediaItem
+  index: number
+  onClick: () => void
+  onReady: (index: number, src: string) => void
+}
+
+function PhotoItem({ item, index, onClick, onReady }: PhotoItemProps) {
+  const isGPhotos = isGPhotosUrl(item.url)
+  const { resolved, loading } = useResolvedMedia(isGPhotos ? item.url : '')
+  const [imgLoaded, setImgLoaded] = useState(false)
+
+  const src = isGPhotos
+    ? (resolved?.displayUrl ?? '')
+    : (validateAndParseMediaUrl(item.url)?.displayUrl ?? '')
+
+  useEffect(() => {
+    if (src) onReady(index, src)
+  }, [src, index, onReady])
+
+  const showSkeleton = !imgLoaded && (loading || !src)
+
+  return (
+    <div style={{ position: 'relative', cursor: 'pointer' }} onClick={onClick}>
+      {showSkeleton && <Skeleton />}
+      {src && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={item.caption || `foto ${index + 1}`}
+          onLoad={() => setImgLoaded(true)}
+          onMouseEnter={(e) => { (e.target as HTMLImageElement).style.transform = 'scale(1.02)' }}
+          onMouseLeave={(e) => { (e.target as HTMLImageElement).style.transform = 'scale(1)' }}
+          style={{
+            width: '100%', aspectRatio: '4/3', objectFit: 'cover',
+            borderRadius: 8, display: imgLoaded ? 'block' : 'none',
+            transition: 'transform 0.2s',
+          }}
+        />
+      )}
+      {item.caption && imgLoaded && (
+        <p style={{ margin: '4px 0 0', fontSize: 11, color: '#666', textAlign: 'center' }}>
+          {item.caption}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function PinGallery({ photos }: Props) {
-  const [loaded, setLoaded] = useState<Record<number, boolean>>({})
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [resolvedSrcs, setResolvedSrcs] = useState<Record<number, string>>({})
+
+  const handleReady = useCallback((index: number, src: string) => {
+    setResolvedSrcs((prev) => prev[index] === src ? prev : { ...prev, [index]: src })
+  }, [])
 
   if (photos.length === 0) return null
 
-  const parsedPhotos = photos.map((p) => {
-    const result = validateAndParseMediaUrl(p.url)
-    return { src: result ? getDirectImageUrl(result.fileId) : '', caption: p.caption }
-  })
+  const lightboxPhotos = photos.map((p, i) => ({
+    src:     resolvedSrcs[i] ?? (validateAndParseMediaUrl(p.url)?.displayUrl ?? ''),
+    caption: p.caption,
+  }))
 
   return (
     <motion.section
@@ -130,35 +186,20 @@ export default function PinGallery({ photos }: Props) {
         className="pin-gallery-grid"
         style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}
       >
-        {parsedPhotos.map((photo, i) => (
-          <div key={i} style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setLightboxIndex(i)}>
-            {!loaded[i] && <Skeleton />}
-            {photo.src && (
-              <img
-                src={photo.src}
-                alt={photo.caption || `foto ${i + 1}`}
-                onLoad={() => setLoaded((prev) => ({ ...prev, [i]: true }))}
-                style={{
-                  width: '100%', aspectRatio: '4/3', objectFit: 'cover',
-                  borderRadius: 8, display: loaded[i] ? 'block' : 'none',
-                  transition: 'transform 0.2s',
-                }}
-                onMouseEnter={(e) => { (e.target as HTMLImageElement).style.transform = 'scale(1.02)' }}
-                onMouseLeave={(e) => { (e.target as HTMLImageElement).style.transform = 'scale(1)' }}
-              />
-            )}
-            {photo.caption && loaded[i] && (
-              <p style={{ margin: '4px 0 0', fontSize: 11, color: '#666', textAlign: 'center' }}>
-                {photo.caption}
-              </p>
-            )}
-          </div>
+        {photos.map((photo, i) => (
+          <PhotoItem
+            key={i}
+            item={photo}
+            index={i}
+            onClick={() => setLightboxIndex(i)}
+            onReady={handleReady}
+          />
         ))}
       </div>
 
       {lightboxIndex !== null && (
         <Lightbox
-          photos={parsedPhotos}
+          photos={lightboxPhotos}
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
         />
@@ -166,3 +207,4 @@ export default function PinGallery({ photos }: Props) {
     </motion.section>
   )
 }
+
