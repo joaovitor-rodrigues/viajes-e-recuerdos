@@ -155,6 +155,7 @@ export default function VideoPlayer({ src, caption }: Props) {
   const [muted, setMuted]           = useState(false)
   const [hovered, setHovered]       = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const [metaReady, setMetaReady]   = useState(false)
 
   const showControls = hovered || !playing
 
@@ -168,7 +169,7 @@ export default function VideoPlayer({ src, caption }: Props) {
       setCurrent(v.currentTime)
       setProgress(v.duration ? v.currentTime / v.duration : 0)
     }
-    const onLoadedMetadata = () => setDuration(v.duration)
+    const onLoadedMetadata = () => { setDuration(v.duration); setMetaReady(true) }
 
     const onFsChange = () => setFullscreen(!!document.fullscreenElement)
 
@@ -230,12 +231,24 @@ export default function VideoPlayer({ src, caption }: Props) {
           userSelect:  'none',
         }}
       >
+        {/* Spinner placeholder until metadata arrives */}
+        {!metaReady && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#150e06' }}>
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+              <circle cx="18" cy="18" r="14" stroke="rgba(253,248,238,0.1)" strokeWidth="3" />
+              <path d="M18 4 A14 14 0 0 1 32 18" stroke="rgba(160,120,72,0.85)" strokeWidth="3" strokeLinecap="round">
+                <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="0.9s" repeatCount="indefinite" />
+              </path>
+            </svg>
+          </div>
+        )}
+
         <video
           ref={videoRef}
           src={src}
           playsInline
           preload="metadata"
-          style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
+          style={{ width: '100%', height: '100%', display: metaReady ? 'block' : 'none', objectFit: 'contain' }}
         />
 
         {/* Click-to-play overlay */}
