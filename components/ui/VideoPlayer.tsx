@@ -234,6 +234,7 @@ export default function VideoPlayer({ src, caption }: Props) {
           ref={videoRef}
           src={src}
           playsInline
+          preload="metadata"
           style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
         />
 

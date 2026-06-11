@@ -14,13 +14,19 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveGPhotosUrl(url)
     if (!resolved) return new NextResponse('Not found', { status: 404 })
 
+    // Videos: redirect directly to Google CDN so the browser fetches bytes
+    // without routing them through this serverless function.
+    if (resolved.mimeType.startsWith('video/')) {
+      return NextResponse.redirect(resolved.displayUrl)
+    }
+
     const parsed = parseGPhotosUrl(url)
     const token  = parsed ? await getValidAccessToken(parsed.label) : null
 
     const upstreamHeaders: Record<string, string> = {}
     if (token) upstreamHeaders['Authorization'] = `Bearer ${token}`
 
-    // Forward Range header so video seeking works (206 Partial Content)
+    // Forward Range header so image seeking / partial content works
     const range = request.headers.get('range')
     if (range) upstreamHeaders['Range'] = range
 
