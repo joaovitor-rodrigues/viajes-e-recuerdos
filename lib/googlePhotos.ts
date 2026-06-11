@@ -164,31 +164,63 @@ export interface ResolvedGPhotosMedia {
   mimeType:   string
 }
 
-// Cache resolved URLs for 45 min — Picker baseUrls are valid ~1 h
+const CACHE_TTL_MS = 45 * 60 * 1000  // 45 min — Picker baseUrls are valid ~1 h
+
+// In-memory cache: fast path for warm serverless instances
 const _resolveCache = new Map<string, { result: ResolvedGPhotosMedia; expiresAt: number }>()
+
+function buildResult(baseUrl: string, mimeType: string): ResolvedGPhotosMedia {
+  const isVideo = mimeType.startsWith('video/')
+  const url = isVideo ? `${baseUrl}=dv` : `${baseUrl}=w1600`
+  return { displayUrl: url, embedUrl: url, mimeType }
+}
 
 export async function resolveGPhotosUrl(url: string): Promise<ResolvedGPhotosMedia | null> {
   const parsed = parseGPhotosUrl(url)
   if (!parsed) return null
 
-  const cached = _resolveCache.get(url)
-  if (cached && cached.expiresAt > Date.now()) return cached.result
+  // 1. In-memory cache (same serverless instance)
+  const mem = _resolveCache.get(url)
+  if (mem && mem.expiresAt > Date.now()) return mem.result
 
+  const db  = createServiceClient()
+  const now = new Date()
+
+  // 2. Supabase cache (persistent across instances)
+  const { data: row } = await db
+    .from('google_photos_url_cache')
+    .select('base_url, mime_type, resolved_at')
+    .eq('gphotos_url', url)
+    .single()
+
+  if (row) {
+    const age = now.getTime() - new Date(row.resolved_at as string).getTime()
+    if (age < CACHE_TTL_MS) {
+      const result = buildResult(row.base_url as string, row.mime_type as string)
+      _resolveCache.set(url, { result, expiresAt: Date.now() + (CACHE_TTL_MS - age) })
+      return result
+    }
+  }
+
+  // 3. Fetch from Google Picker API and populate both caches
   try {
     const items = await listPickerSessionItems(parsed.label, parsed.sessionId)
     const item  = items.find(i => i.id === parsed.itemId)
     if (!item) return null
 
-    const base    = item.mediaFile.baseUrl
-    const isVideo = item.mediaFile.mimeType.startsWith('video/')
+    const baseUrl  = item.mediaFile.baseUrl
+    const mimeType = item.mediaFile.mimeType
+    const result   = buildResult(baseUrl, mimeType)
 
-    const result: ResolvedGPhotosMedia = {
-      displayUrl: isVideo ? `${base}=dv` : `${base}=w1600`,
-      embedUrl:   isVideo ? `${base}=dv` : `${base}=w1600`,
-      mimeType:   item.mediaFile.mimeType,
-    }
+    // Upsert to Supabase cache
+    await db.from('google_photos_url_cache').upsert({
+      gphotos_url: url,
+      base_url:    baseUrl,
+      mime_type:   mimeType,
+      resolved_at: now.toISOString(),
+    }, { onConflict: 'gphotos_url' })
 
-    _resolveCache.set(url, { result, expiresAt: Date.now() + 45 * 60 * 1000 })
+    _resolveCache.set(url, { result, expiresAt: Date.now() + CACHE_TTL_MS })
     return result
   } catch {
     return null
