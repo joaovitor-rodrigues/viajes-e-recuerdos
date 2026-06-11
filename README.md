@@ -6,15 +6,17 @@ Um mapa interativo pessoal e privado para registrar memórias de viagem. Cada pi
 
 ## Stack e Arquitetura
 
-**Frontend:** Next.js 14 (App Router) com TypeScript. As rotas são divididas em dois grupos: `(auth)` para o login e `(app)` para as páginas protegidas. O layout raiz carrega as cinco fontes via `next/font/google` com `display: swap`. Todos os componentes de mapa usam `dynamic(() => import(...), { ssr: false })` porque o Leaflet acessa `window` e não é compatível com SSR.
+**Frontend:** Next.js 14 (App Router) com TypeScript. As rotas são divididas em dois grupos: `(auth)` para o login e `(app)` para as páginas protegidas. Todos os componentes de mapa usam `dynamic(() => import(...), { ssr: false })` porque o Leaflet acessa `window` e não é compatível com SSR.
 
-**Banco de dados:** Supabase (PostgreSQL) com Row Level Security habilitado. Todas as escritas exigem `auth.role() = 'authenticated'`. A autenticação é anônima — o usuário não tem e-mail nem senha no Supabase; a senha do app é verificada localmente via bcrypt e, se correta, gera uma sessão anônima com `signInAnonymously()`. O hash da senha fica em variável de ambiente no servidor, nunca exposto ao cliente.
+**Banco de dados:** Supabase (PostgreSQL) com Row Level Security habilitado em todas as tabelas. A autenticação é anônima — o usuário não tem e-mail nem senha no Supabase; a senha do app é verificada localmente via bcrypt e, se correta, gera uma sessão anônima com `signInAnonymously()`. O hash da senha fica em variável de ambiente no servidor, nunca exposto ao cliente.
 
-**Estado global:** Zustand com três stores — `pinsStore` (lista de pins), `mapStore` (referência ao mapa Leaflet, modo de criação) e `themeStore` (tema visual com CSS variables). O Supabase Realtime mantém os dois estados sincronizados em tempo real via `postgres_changes`.
+**Estado global:** Zustand com três stores — `pinsStore` (lista de pins), `mapStore` (referência ao mapa Leaflet, modo de criação) e `themeStore` (tema visual com CSS variables). O Supabase Realtime sincroniza pins e tema em tempo real via `postgres_changes`.
 
-**Media:** Fotos e vídeos ficam no Google Drive do usuário. O app só armazena a URL e extrai o `fileId` para gerar URLs de embed (`/preview`) e download direto (`lh3.googleusercontent.com`). Nenhum arquivo passa pelo servidor.
+**Mídia — Google Photos:** Fotos e vídeos podem ser adicionados via Google Photos Picker API. Cada conta Google conectada passa por um fluxo OAuth (`/api/auth/google`), e o token é armazenado na tabela `google_tokens` (service role only). No banco, a mídia é salva como URL `gphotos://label/sessionId/itemId`. Para servir, o Edge Function `/api/photos/proxy` resolve a URL (com cache na tabela `google_photos_url_cache`), adiciona o Bearer token e faz streaming do Google CDN para o cliente. O Edge Runtime elimina o limite de 4.5 MB das funções serverless e não tem cold start.
 
-**Deploy:** Vercel com os headers de segurança em `vercel.json`. O domínio `viajes.joaovrodrigues.com.br` aponta via CNAME para o projeto na Vercel. O Supabase pode ser o tier gratuito (projetos pausam após 1 semana de inatividade) ou um plano pago para uso contínuo.
+**Mídia — Google Drive:** Também é possível adicionar mídia via Google Drive Picker. O app extrai o `fileId` e gera URLs de embed (`/preview`) e download direto (`lh3.googleusercontent.com`). Esses arquivos não passam pelo servidor.
+
+**Deploy:** Vercel (plano Hobby compatível) com headers de segurança em `vercel.json`. O domínio `viajes.joaovrodrigues.com.br` aponta via CNAME para o projeto na Vercel.
 
 ---
 
@@ -28,11 +30,14 @@ npm install
 
 # 2. Configurar variáveis de ambiente
 cp .env.example .env.local
-# Preencher NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, APP_PASSWORD_HASH
+# Preencher todas as variáveis (ver tabela abaixo)
 
-# 3. Criar schema no Supabase
-npx supabase db push
-# ou executar manualmente: supabase/migrations/001_initial_schema.sql
+# 3. Criar schema no Supabase (executar todas as migrations em ordem)
+# No SQL editor do Supabase, rodar:
+#   supabase/migrations/001_initial_schema.sql
+#   supabase/migrations/002_date_range.sql
+#   supabase/migrations/003_google_tokens.sql
+#   supabase/migrations/004_photos_url_cache.sql
 
 # 4. (Opcional) Popular com pins de exemplo
 # Executar supabase/seed.sql no SQL editor do Supabase
@@ -58,7 +63,20 @@ npx ts-node scripts/generate-hash.ts "minha-senha-aqui"
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave pública (anon) do Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave service role (acesso a tabelas com RLS deny_all) |
 | `APP_PASSWORD_HASH` | Hash bcrypt da senha do app |
+| `GOOGLE_CLIENT_ID` | Client ID do app OAuth no Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Client Secret do app OAuth no Google Cloud Console |
+| `NEXTAUTH_SECRET` | String aleatória para assinar cookies de sessão |
+| `NEXT_PUBLIC_APP_URL` | URL pública do app (ex: `https://viajes.joaovrodrigues.com.br`) |
+
+### Configurar Google OAuth
+
+1. [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials → Create OAuth 2.0 Client ID
+2. Tipo: Web Application
+3. Authorized redirect URIs: `{NEXT_PUBLIC_APP_URL}/api/auth/google/callback`
+4. Ativar as APIs: **Google Photos Picker API** e **Google Drive API**
+5. Copiar Client ID e Secret para `.env.local`
 
 ---
 
@@ -76,7 +94,7 @@ npx vercel --prod
 
 1. No painel Vercel: **Project → Settings → Domains → Add Domain**
 2. Digitar `viajes.joaovrodrigues.com.br`
-3. No provedor DNS (Cloudflare, Registro.br, etc.), adicionar:
+3. No provedor DNS, adicionar:
    ```
    CNAME  viajes  cname.vercel-dns.com
    ```
@@ -98,81 +116,127 @@ A senha e o host estão em **Supabase → Settings → Database → Connection s
 
 ---
 
-## Migrar de Banco (Neon / Railway / Oracle)
-
-1. Exportar dados do Supabase atual:
-   ```bash
-   pg_dump <supabase-url> --data-only --schema=public -f data.sql
-   ```
-2. No novo banco, executar o schema:
-   ```bash
-   psql <novo-banco-url> -f supabase/migrations/001_initial_schema.sql
-   ```
-3. Importar os dados:
-   ```bash
-   psql <novo-banco-url> -f data.sql
-   ```
-4. Atualizar `.env.local` (e variáveis na Vercel) com a nova connection string
-5. Recriar as políticas RLS se o novo banco não suportar `auth.role()` do Supabase — substituir pela política adequada ao novo provider de autenticação
-
----
-
 ## Estrutura de Pastas
 
 ```
 viajes-e-recuerdos/
 ├── app/
-│   ├── (auth)/login/          # Tela de login (isolada do layout da app)
+│   ├── (auth)/login/              # Tela de login
 │   ├── (app)/
-│   │   ├── layout.tsx         # Layout client: aplica CSS variables do tema
-│   │   ├── mapa/page.tsx      # Mapa principal (server → passa dados ao MapContainer)
+│   │   ├── layout.tsx             # Layout client: CSS variables do tema
+│   │   ├── mapa/page.tsx          # Mapa principal
 │   │   └── pin/[id]/
-│   │       ├── page.tsx       # Página de detalhe do pin
-│   │       └── editar/        # Formulário de edição
+│   │       ├── page.tsx           # Página de detalhe do pin
+│   │       └── editar/            # Formulário de edição
 │   ├── api/
-│   │   ├── auth/login|logout  # Autenticação bcrypt + Supabase anônimo
-│   │   ├── pins/              # CRUD de pins (GET, POST, PUT, DELETE)
-│   │   ├── theme/             # GET + PATCH do visual_theme
-│   │   └── geocoding/         # Proxy Nominatim com cache in-memory
-│   ├── layout.tsx             # Root: Google Fonts (5 famílias) + metadata
-│   └── globals.css            # CSS variables, scrollbar, media queries mobile
+│   │   ├── auth/
+│   │   │   ├── login|logout/      # Autenticação bcrypt + Supabase anônimo
+│   │   │   └── google/            # OAuth flow: /google → Google → /google/callback
+│   │   ├── pins/                  # CRUD de pins (GET, POST, PUT, DELETE)
+│   │   ├── theme/                 # GET + PATCH do visual_theme
+│   │   ├── geocoding/             # Proxy Nominatim com cache in-memory
+│   │   └── photos/
+│   │       ├── proxy/             # Edge Runtime: resolve + stream com Bearer token
+│   │       ├── resolve/           # Resolve gphotos:// → displayUrl (CDN-cached)
+│   │       ├── accounts/          # Lista contas Google conectadas
+│   │       ├── token/             # Retorna access token válido para o Drive Picker
+│   │       └── session/           # Cria e consulta sessões do Google Photos Picker
+│   ├── layout.tsx                 # Root: fontes + metadata
+│   └── globals.css                # CSS variables, scrollbar, media queries
 │
 ├── components/
-│   ├── map/                   # MapContainer, MapPin, CitySearchBox, PinCreationMarker
-│   │                          # MapSkeleton, MapErrorBoundary
-│   ├── pins/                  # PinCreateModal, PinEditForm, MediaInput, EditPinClient
-│   ├── pin-page/              # PinHero, PinGallery, PinVideoPlayer, PinMiniMap
-│   ├── sidebar/               # Sidebar, StatsBar, PinList
-│   └── theme/                 # ThemePanel, ParticleCanvas
+│   ├── map/
+│   │   ├── MapContainer.tsx       # Leaflet map, pins, overlays
+│   │   ├── MapPin.tsx             # Marcador com bandeira do país
+│   │   ├── CitySearchBox.tsx      # Busca de cidades (Nominatim)
+│   │   ├── PinCreationMarker.tsx  # Marcador arrastável ao criar pin
+│   │   ├── PinDetailOverlay.tsx   # Overlay flutuante com detalhes do pin
+│   │   ├── PinEditOverlay.tsx     # Overlay de edição rápida no mapa
+│   │   ├── StarField.tsx          # Globo 3D com estrelas (react-globe.gl)
+│   │   ├── MapSkeleton.tsx        # Placeholder durante SSR
+│   │   └── MapErrorBoundary.tsx
+│   ├── pins/
+│   │   ├── PinCreateModal.tsx     # Modal de criação de pin
+│   │   ├── PinEditForm.tsx        # Formulário de edição completo
+│   │   ├── MediaInput.tsx         # Input de mídia (foto/vídeo) com preview
+│   │   ├── EditPinClient.tsx      # Client wrapper da página de edição
+│   │   ├── GooglePhotosPicker.tsx # Picker do Google Photos (Picker API)
+│   │   └── GoogleDrivePicker.tsx  # Picker do Google Drive
+│   ├── pin-page/
+│   │   ├── PinHero.tsx            # Cabeçalho da página do pin
+│   │   ├── PinGallery.tsx         # Grade de fotos com lightbox
+│   │   ├── PinVideoPlayer.tsx     # Acordeão de vídeos com pré-fetch de metadados
+│   │   └── PinMiniMap.tsx         # Mini-mapa estático na página do pin
+│   ├── sidebar/
+│   │   ├── Sidebar.tsx            # Painel lateral com lista de pins e controles
+│   │   ├── FloatingPinPanel.tsx   # Painel flutuante com status das contas Google
+│   │   ├── PinList.tsx            # Lista de pins com busca e filtros
+│   │   └── StatsBar.tsx           # Contadores: pins, países, cidades
+│   ├── theme/
+│   │   ├── ThemePanel.tsx         # Editor visual do tema (cores, partículas)
+│   │   └── ParticleCanvas.tsx     # Canvas de partículas animadas
+│   └── ui/
+│       └── VideoPlayer.tsx        # Player de vídeo customizado com seek bar
 │
 ├── hooks/
-│   ├── usePins.ts             # CRUD + optimistic updates + Realtime subscription
-│   └── useTheme.ts            # CSS vars + Realtime + updateAndSync + resetToDefault
+│   ├── usePins.ts                 # CRUD + optimistic updates + Realtime
+│   ├── useResolvedMedia.ts        # Resolve gphotos:// → URL do proxy
+│   └── useTheme.ts                # CSS vars + Realtime + reset
 │
 ├── stores/
-│   ├── pinsStore.ts           # Zustand: lista de pins
-│   ├── mapStore.ts            # Zustand: mapRef, modo criação, flyTo
-│   └── themeStore.ts          # Zustand: tema visual + DEFAULT_THEME
+│   ├── pinsStore.ts               # Zustand: lista de pins
+│   ├── mapStore.ts                # Zustand: mapRef, modo criação, flyTo
+│   └── themeStore.ts              # Zustand: tema visual + DEFAULT_THEME
 │
 ├── lib/
-│   ├── supabase/client.ts     # Browser client (@supabase/ssr)
-│   ├── supabase/server.ts     # Server client com cookies()
-│   ├── auth.ts                # verifyPassword / generatePasswordHash (bcryptjs)
-│   ├── geocoding.ts           # searchCity / reverseGeocode (Nominatim)
-│   ├── drive.ts               # parseGoogleDriveUrl / getEmbedUrl / getDirectImageUrl
-│   └── validations.ts         # Zod schemas: PinSchema, PinUpdateSchema
+│   ├── supabase/
+│   │   ├── client.ts              # Browser client (@supabase/ssr)
+│   │   ├── server.ts              # Server client com cookies()
+│   │   └── service.ts             # Service role client (bypassa RLS)
+│   ├── auth.ts                    # verifyPassword / generatePasswordHash
+│   ├── geocoding.ts               # searchCity / reverseGeocode (Nominatim)
+│   ├── drive.ts                   # parseGoogleDriveUrl, embedUrl, displayUrl
+│   ├── googlePhotos.ts            # Picker API: tokens, sessões, resolve + cache
+│   ├── dateRange.ts               # Helpers para intervalo de datas da viagem
+│   ├── flags.ts                   # Mapeamento país → emoji de bandeira
+│   ├── flagColors.ts              # Cores dominantes das bandeiras por país
+│   └── validations.ts             # Zod schemas: PinSchema, PinUpdateSchema
 │
 ├── types/
-│   └── database.ts            # Pin, MediaItem, VisualTheme, PinInsert, PinUpdate
+│   └── database.ts                # Pin, MediaItem, VisualTheme, PinInsert, PinUpdate
 │
 ├── supabase/
-│   ├── migrations/001_initial_schema.sql
-│   └── seed.sql               # 5 pins de exemplo
+│   ├── migrations/
+│   │   ├── 001_initial_schema.sql # Tabelas pins, visual_theme, funções RLS
+│   │   ├── 002_date_range.sql     # Campos start_date / end_date nos pins
+│   │   ├── 003_google_tokens.sql  # OAuth tokens Google (service role only)
+│   │   └── 004_photos_url_cache.sql # Cache de baseUrls do Picker (TTL 45 min)
+│   └── seed.sql                   # Pins de exemplo
 │
 ├── scripts/
-│   └── generate-hash.ts       # npx ts-node scripts/generate-hash.ts "senha"
+│   └── generate-hash.ts           # Gera APP_PASSWORD_HASH
 │
-├── middleware.ts              # Protege /(app)/*, /api/pins, /api/theme
-├── vercel.json                # Security headers + redirect / → /login
-└── .env.local                 # NEXT_PUBLIC_SUPABASE_URL, ANON_KEY, APP_PASSWORD_HASH
+├── public/
+│   └── data/country-labels.json   # Nomes e coordenadas de países para o globo
+│
+├── middleware.ts                  # Protege /(app)/*, /api/pins, /api/theme, /api/photos
+├── vercel.json                    # Security headers + redirect / → /login
+└── .env.local                     # Variáveis de ambiente (não commitado)
+```
+
+---
+
+## Fluxo de Mídia do Google Photos
+
+```
+Adicionar foto/vídeo:
+  Picker UI → Google Photos Picker API → gphotos://label/sessionId/itemId
+  → salvo no banco como MediaItem.url
+
+Exibir:
+  gphotos://... → /api/photos/proxy (Edge Runtime)
+    ├── Supabase cache (google_photos_url_cache, TTL 45 min)  ← hit: rápido
+    │   └── miss: listPickerSessionItems → Google Picker API → upsert cache
+    ├── getValidAccessToken → google_tokens (auto-refresh via refresh_token)
+    └── fetch(baseUrl=dv|w1600, Bearer token) → stream para o cliente
 ```

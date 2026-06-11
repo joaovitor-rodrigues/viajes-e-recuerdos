@@ -8,6 +8,13 @@ import type { MediaItem } from '@/types/database'
 
 interface Props { videos: MediaItem[] }
 
+function fmt(s: number): string {
+  if (!isFinite(s) || s <= 0) return ''
+  const m   = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
 function PlayIcon() {
   return (
     <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
@@ -17,16 +24,126 @@ function PlayIcon() {
   )
 }
 
-export default function PinVideoPlayer({ videos }: Props) {
-  const [openIndex, setOpenIndex] = useState<number | null>(0)
+function Spinner() {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#000', zIndex: 1,
+    }}>
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="14" stroke="rgba(253,248,238,0.15)" strokeWidth="3" />
+        <path
+          d="M18 4 A14 14 0 0 1 32 18"
+          stroke="rgba(160,120,72,0.85)" strokeWidth="3"
+          strokeLinecap="round"
+        >
+          <animateTransform
+            attributeName="transform" type="rotate"
+            from="0 18 18" to="360 18 18"
+            dur="0.9s" repeatCount="indefinite"
+          />
+        </path>
+      </svg>
+    </div>
+  )
+}
 
-  // Warm up the Supabase URL cache for Google Photos videos on mount.
+// ── Per-video accordion item (Google Photos) ──────────────────────────────────
+
+interface GPhotosVideoItemProps {
+  video:    MediaItem
+  index:    number
+  isOpen:   boolean
+  duration: number | undefined
+  onToggle: () => void
+}
+
+function GPhotosVideoItem({ video, index, isOpen, duration, onToggle }: GPhotosVideoItemProps) {
+  const [metaReady, setMetaReady] = useState(false)
+  const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(video.url)}`
+
+  // Reset readiness when accordion is re-opened so spinner shows again if needed
   useEffect(() => {
-    const gphotosVideos = videos.filter(v => isGPhotosUrl(v.url))
-    if (gphotosVideos.length === 0) return
-    gphotosVideos.forEach(v => {
-      fetch(`/api/photos/resolve?url=${encodeURIComponent(v.url)}`).catch(() => {})
+    if (!isOpen) setMetaReady(false)
+  }, [isOpen])
+
+  return (
+    <div style={{
+      border: '1px solid rgba(160,120,72,0.2)',
+      borderRadius: 6, overflow: 'hidden',
+      background: 'rgba(253,248,238,0.6)',
+    }}>
+      <button
+        onClick={onToggle}
+        style={{
+          width: '100%', padding: '11px 16px',
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          color: '#2c1a0e', fontSize: 13, textAlign: 'left',
+          fontFamily: '"Inter", sans-serif',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 15 }}>🎬</span>
+          {video.caption || `Vídeo ${index + 1}`}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {duration != null && (
+            <span style={{ fontSize: 11, color: '#a07840', fontFamily: '"Inter",sans-serif' }}>
+              {fmt(duration)}
+            </span>
+          )}
+          <span style={{ color: '#a07840', fontSize: 12 }}>{isOpen ? '▲' : '▼'}</span>
+        </span>
+      </button>
+
+      {isOpen && (
+        <div style={{ padding: '0 0 8px', position: 'relative' }}>
+          {!metaReady && <Spinner />}
+          <video
+            src={proxyUrl}
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={() => setMetaReady(true)}
+            style={{ width: '100%', display: 'block', background: '#000' }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function PinVideoPlayer({ videos }: Props) {
+  const [openIndex, setOpenIndex]   = useState<number | null>(0)
+  const [durations, setDurations]   = useState<Record<number, number>>({})
+
+  useEffect(() => {
+    const elements: HTMLVideoElement[] = []
+
+    videos.forEach((video, i) => {
+      if (!isGPhotosUrl(video.url)) return
+
+      // Warm up Supabase URL cache
+      fetch(`/api/photos/resolve?url=${encodeURIComponent(video.url)}`).catch(() => {})
+
+      // Pre-fetch video metadata with a detached element so the browser caches
+      // the initial proxy response; also gives us duration for the accordion header.
+      const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(video.url)}`
+      const el = document.createElement('video')
+      el.preload = 'metadata'
+      el.src = proxyUrl
+      el.onloadedmetadata = () => {
+        setDurations(prev => ({ ...prev, [i]: el.duration }))
+        el.src = '' // release the connection — metadata is cached by the browser
+      }
+      elements.push(el)
     })
+
+    return () => { elements.forEach(el => { el.src = '' }) }
   }, [videos])
 
   if (videos.length === 0) return null
@@ -48,55 +165,27 @@ export default function PinVideoPlayer({ videos }: Props) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {videos.map((video, i) => {
-          const isOpen  = openIndex === i
+          const isOpen = openIndex === i
 
-          // ── Google Photos — inline video player ────────────────────────
+          // ── Google Photos ─────────────────────────────────────────────────
           if (isGPhotosUrl(video.url)) {
-            const videoSrc = `/api/photos/proxy?url=${encodeURIComponent(video.url)}`
             return (
-              <div key={i} style={{
-                border: '1px solid rgba(160,120,72,0.2)',
-                borderRadius: 6, overflow: 'hidden',
-                background: 'rgba(253,248,238,0.6)',
-              }}>
-                <button
-                  onClick={() => setOpenIndex(isOpen ? null : i)}
-                  style={{
-                    width: '100%', padding: '11px 16px',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    color: '#2c1a0e', fontSize: 13, textAlign: 'left',
-                    fontFamily: '"Inter", sans-serif',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 15 }}>🎬</span>
-                    {video.caption || `Vídeo ${i + 1}`}
-                  </span>
-                  <span style={{ color: '#a07840', fontSize: 12 }}>{isOpen ? '▲' : '▼'}</span>
-                </button>
-
-                {isOpen && (
-                  <div style={{ padding: '0 0 8px' }}>
-                    <video
-                      src={videoSrc}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      style={{ width: '100%', display: 'block', background: '#000' }}
-                    />
-                  </div>
-                )}
-              </div>
+              <GPhotosVideoItem
+                key={i}
+                video={video}
+                index={i}
+                isOpen={isOpen}
+                duration={durations[i]}
+                onToggle={() => setOpenIndex(isOpen ? null : i)}
+              />
             )
           }
 
-          const parsed = validateAndParseMediaUrl(video.url)
+          const parsed  = validateAndParseMediaUrl(video.url)
           const isDrive = !!parsed?.fileId
-
           if (!parsed) return null
 
-          // ── Google Drive — inline accordion player ─────────────────────
+          // ── Google Drive ──────────────────────────────────────────────────
           if (isDrive) {
             return (
               <div key={i} style={{
@@ -137,7 +226,7 @@ export default function PinVideoPlayer({ videos }: Props) {
             )
           }
 
-          // ── External URL — popup player ──────────────────────────────────
+          // ── URL externa ───────────────────────────────────────────────────
           return (
             <button
               key={i}
@@ -167,4 +256,3 @@ export default function PinVideoPlayer({ videos }: Props) {
     </motion.section>
   )
 }
-
