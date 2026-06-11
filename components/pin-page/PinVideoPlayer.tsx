@@ -26,26 +26,20 @@ function PlayIcon() {
 
 function Spinner() {
   return (
-    <div style={{
-      position: 'absolute', inset: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#000', zIndex: 1,
-    }}>
-      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-        <circle cx="18" cy="18" r="14" stroke="rgba(253,248,238,0.15)" strokeWidth="3" />
-        <path
-          d="M18 4 A14 14 0 0 1 32 18"
-          stroke="rgba(160,120,72,0.85)" strokeWidth="3"
-          strokeLinecap="round"
-        >
-          <animateTransform
-            attributeName="transform" type="rotate"
-            from="0 18 18" to="360 18 18"
-            dur="0.9s" repeatCount="indefinite"
-          />
-        </path>
-      </svg>
-    </div>
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+      <circle cx="18" cy="18" r="14" stroke="rgba(253,248,238,0.15)" strokeWidth="3" />
+      <path
+        d="M18 4 A14 14 0 0 1 32 18"
+        stroke="rgba(160,120,72,0.85)" strokeWidth="3"
+        strokeLinecap="round"
+      >
+        <animateTransform
+          attributeName="transform" type="rotate"
+          from="0 18 18" to="360 18 18"
+          dur="0.9s" repeatCount="indefinite"
+        />
+      </path>
+    </svg>
   )
 }
 
@@ -55,18 +49,22 @@ interface GPhotosVideoItemProps {
   video:    MediaItem
   index:    number
   isOpen:   boolean
-  duration: number | undefined
   onToggle: () => void
 }
 
-function GPhotosVideoItem({ video, index, isOpen, duration, onToggle }: GPhotosVideoItemProps) {
+function GPhotosVideoItem({ video, index, isOpen, onToggle }: GPhotosVideoItemProps) {
   const [metaReady, setMetaReady] = useState(false)
+  const [duration, setDuration]   = useState<number | undefined>()
   const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(video.url)}`
 
-  // Reset readiness when accordion is re-opened so spinner shows again if needed
   useEffect(() => {
     if (!isOpen) setMetaReady(false)
   }, [isOpen])
+
+  function handleMeta(e: React.SyntheticEvent<HTMLVideoElement>) {
+    setDuration(e.currentTarget.duration)
+    setMetaReady(true)
+  }
 
   return (
     <div style={{
@@ -99,15 +97,24 @@ function GPhotosVideoItem({ video, index, isOpen, duration, onToggle }: GPhotosV
       </button>
 
       {isOpen && (
-        <div style={{ padding: '0 0 8px', position: 'relative' }}>
-          {!metaReady && <Spinner />}
+        <div style={{ padding: '0 0 8px' }}>
+          {/* Placeholder visível até os metadados chegarem — o spinner fica aqui,
+              não sobreposto ao <video controls> (cujos controles nativos ignoram z-index) */}
+          {!metaReady && (
+            <div style={{
+              aspectRatio: '16/9', background: '#000',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Spinner />
+            </div>
+          )}
           <video
             src={proxyUrl}
             controls
             playsInline
             preload="metadata"
-            onLoadedMetadata={() => setMetaReady(true)}
-            style={{ width: '100%', display: 'block', background: '#000' }}
+            onLoadedMetadata={handleMeta}
+            style={{ width: '100%', display: metaReady ? 'block' : 'none', background: '#000' }}
           />
         </div>
       )}
@@ -118,32 +125,14 @@ function GPhotosVideoItem({ video, index, isOpen, duration, onToggle }: GPhotosV
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function PinVideoPlayer({ videos }: Props) {
-  const [openIndex, setOpenIndex]   = useState<number | null>(0)
-  const [durations, setDurations]   = useState<Record<number, number>>({})
+  const [openIndex, setOpenIndex] = useState<number | null>(0)
 
+  // Warm up Supabase URL cache for all Google Photos videos on mount
   useEffect(() => {
-    const elements: HTMLVideoElement[] = []
-
-    videos.forEach((video, i) => {
+    videos.forEach(video => {
       if (!isGPhotosUrl(video.url)) return
-
-      // Warm up Supabase URL cache
       fetch(`/api/photos/resolve?url=${encodeURIComponent(video.url)}`).catch(() => {})
-
-      // Pre-fetch video metadata with a detached element so the browser caches
-      // the initial proxy response; also gives us duration for the accordion header.
-      const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(video.url)}`
-      const el = document.createElement('video')
-      el.preload = 'metadata'
-      el.src = proxyUrl
-      el.onloadedmetadata = () => {
-        setDurations(prev => ({ ...prev, [i]: el.duration }))
-        el.src = '' // release the connection — metadata is cached by the browser
-      }
-      elements.push(el)
     })
-
-    return () => { elements.forEach(el => { el.src = '' }) }
   }, [videos])
 
   if (videos.length === 0) return null
@@ -175,7 +164,6 @@ export default function PinVideoPlayer({ videos }: Props) {
                 video={video}
                 index={i}
                 isOpen={isOpen}
-                duration={durations[i]}
                 onToggle={() => setOpenIndex(isOpen ? null : i)}
               />
             )
