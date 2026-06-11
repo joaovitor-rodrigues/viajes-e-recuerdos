@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveGPhotosUrl, isGPhotosUrl, getValidAccessToken, parseGPhotosUrl } from '@/lib/googlePhotos'
 
+// Edge Runtime: no response-body size limit (serverless caps at 4.5 MB on Hobby),
+// no cold starts, and true streaming — critical for large video files.
+export const runtime = 'edge'
+
 // GET /api/photos/proxy?url=gphotos://label/sessionId/itemId
-// Resolves the gphotos:// URL and streams the image from Google through the server.
-// Required because Google Photos Picker baseUrls may need the access token to load.
+// Resolves the gphotos:// URL and streams the media from Google through the server.
+// Required because Google Photos Picker baseUrls need the Bearer token to load.
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url')
   if (!url || !isGPhotosUrl(url)) {
