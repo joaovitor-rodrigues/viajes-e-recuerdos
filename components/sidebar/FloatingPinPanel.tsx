@@ -46,19 +46,30 @@ const LABELS: { label: string; slug: string }[] = [
   { label: 'Jéssica', slug: 'jéssica' },
 ]
 
-type AccountRow = { label: string; email: string; expires_at: string }
+type AccountRow = { label: string; email: string }
 
 function GoogleAccountsBar() {
   const [accounts, setAccounts] = useState<AccountRow[]>([])
 
   useEffect(() => {
-    fetch('/api/photos/accounts')
-      .then(r => r.ok ? r.json() : [])
-      .then((rows: AccountRow[]) => setAccounts(rows))
-      .catch(() => {})
-  }, [])
+    const refetch = () => {
+      fetch('/api/photos/accounts')
+        .then(r => r.ok ? r.json() : [])
+        .then((rows: AccountRow[]) => setAccounts(rows))
+        .catch(() => {})
+    }
 
-  const now = Date.now()
+    refetch()
+
+    const onFocus = () => refetch()
+    const onVisible = () => { if (!document.hidden) refetch() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   return (
     <div style={{
@@ -71,25 +82,18 @@ function GoogleAccountsBar() {
       </p>
       <div style={{ display: 'flex', gap: 6 }}>
         {LABELS.map(({ label, slug }) => {
-          const row     = accounts.find(r => r.label === slug)
-          const expired = !!row && new Date(row.expires_at).getTime() < now
-          const valid   = !!row && !expired
+          const row   = accounts.find(r => r.label === slug)
+          const valid = !!row
 
-          const borderColor = valid   ? 'rgba(52,168,83,0.45)'
-                            : expired ? 'rgba(201,72,91,0.4)'
-                            :           'rgba(160,120,72,0.25)'
-          const bgColor     = valid   ? 'rgba(52,168,83,0.07)'
-                            : expired ? 'rgba(201,72,91,0.06)'
-                            :           'rgba(160,120,72,0.05)'
-          const textColor   = valid   ? '#2a7a50'
-                            : expired ? '#9a2a3a'
-                            :           '#9a8068'
+          const borderColor = valid ? 'rgba(52,168,83,0.45)' : 'rgba(160,120,72,0.25)'
+          const bgColor     = valid ? 'rgba(52,168,83,0.07)' : 'rgba(160,120,72,0.05)'
+          const textColor   = valid ? '#2a7a50'              : '#9a8068'
 
           return (
             <a
               key={slug}
               href={!valid ? `/api/auth/google?label=${encodeURIComponent(slug)}` : undefined}
-              title={valid ? row?.email : expired ? `Token expirado — clique para reconectar` : `Conectar conta de ${label}`}
+              title={valid ? row?.email ?? label : `Conectar conta de ${label}`}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                 padding: '6px 6px 5px', borderRadius: 4, textDecoration: 'none',
@@ -106,16 +110,13 @@ function GoogleAccountsBar() {
                   <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="2 6 5 9 10 3" />
                   </svg>
-                ) : expired ? '!' : '+'}
+                ) : '+'}
                 {label}
               </span>
-              {valid && row && (
+              {valid && row?.email && (
                 <span style={{ fontSize: 9, color: '#5a9a78', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {row.email.replace(/@.*/, '')}
                 </span>
-              )}
-              {expired && (
-                <span style={{ fontSize: 9, color: '#b04050' }}>reconectar</span>
               )}
             </a>
           )
