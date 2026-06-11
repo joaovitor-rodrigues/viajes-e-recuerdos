@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { validateAndParseMediaUrl } from '@/lib/drive'
 import { isGPhotosUrl } from '@/lib/googlePhotos'
@@ -19,6 +19,15 @@ function PlayIcon() {
 
 export default function PinVideoPlayer({ videos }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
+
+  // Warm up the Supabase URL cache for Google Photos videos on mount.
+  useEffect(() => {
+    const gphotosVideos = videos.filter(v => isGPhotosUrl(v.url))
+    if (gphotosVideos.length === 0) return
+    gphotosVideos.forEach(v => {
+      fetch(`/api/photos/resolve?url=${encodeURIComponent(v.url)}`).catch(() => {})
+    })
+  }, [videos])
 
   if (videos.length === 0) return null
 

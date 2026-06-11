@@ -155,6 +155,17 @@ export default function PinGallery({ photos }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [resolvedSrcs, setResolvedSrcs] = useState<Record<number, string>>({})
 
+  // Warm up the Supabase URL cache for all Google Photos images on mount.
+  // This runs regardless of browser HTTP cache state, ensuring the server-side
+  // cache is always populated for fast proxy responses across serverless instances.
+  useEffect(() => {
+    const gphotosItems = photos.filter(p => isGPhotosUrl(p.url))
+    if (gphotosItems.length === 0) return
+    gphotosItems.forEach(p => {
+      fetch(`/api/photos/resolve?url=${encodeURIComponent(p.url)}`).catch(() => {})
+    })
+  }, [photos])
+
   const handleReady = useCallback((index: number, src: string) => {
     setResolvedSrcs((prev) => prev[index] === src ? prev : { ...prev, [index]: src })
   }, [])
