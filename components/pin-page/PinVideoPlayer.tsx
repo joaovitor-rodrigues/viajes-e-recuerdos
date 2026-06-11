@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { validateAndParseMediaUrl } from '@/lib/drive'
 import { isGPhotosUrl } from '@/lib/googlePhotos'
@@ -19,24 +19,6 @@ function PlayIcon() {
 
 export default function PinVideoPlayer({ videos }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
-  // Pre-resolved direct CDN URLs for Google Photos videos (avoids proxy streaming)
-  const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    const gphotosVideos = videos.filter(v => isGPhotosUrl(v.url))
-    if (gphotosVideos.length === 0) return
-
-    gphotosVideos.forEach(video => {
-      fetch(`/api/photos/resolve?url=${encodeURIComponent(video.url)}`)
-        .then(r => r.ok ? r.json() : null)
-        .then((data: { displayUrl?: string } | null) => {
-          if (data?.displayUrl) {
-            setResolvedUrls(prev => ({ ...prev, [video.url]: data.displayUrl! }))
-          }
-        })
-        .catch(() => {})
-    })
-  }, [videos])
 
   if (videos.length === 0) return null
 
@@ -61,9 +43,7 @@ export default function PinVideoPlayer({ videos }: Props) {
 
           // ── Google Photos — inline video player ────────────────────────
           if (isGPhotosUrl(video.url)) {
-            // Prefer direct CDN URL (pre-resolved on mount); fall back to proxy
-            const videoSrc = resolvedUrls[video.url]
-              ?? `/api/photos/proxy?url=${encodeURIComponent(video.url)}`
+            const videoSrc = `/api/photos/proxy?url=${encodeURIComponent(video.url)}`
             return (
               <div key={i} style={{
                 border: '1px solid rgba(160,120,72,0.2)',

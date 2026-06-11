@@ -14,12 +14,6 @@ export async function GET(request: NextRequest) {
     const resolved = await resolveGPhotosUrl(url)
     if (!resolved) return new NextResponse('Not found', { status: 404 })
 
-    // Videos: redirect directly to Google CDN so the browser fetches bytes
-    // without routing them through this serverless function.
-    if (resolved.mimeType.startsWith('video/')) {
-      return NextResponse.redirect(resolved.displayUrl)
-    }
-
     const parsed = parseGPhotosUrl(url)
     const token  = parsed ? await getValidAccessToken(parsed.label) : null
 
